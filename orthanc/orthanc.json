@@ -1,0 +1,19 @@
+{
+  "Name" : "Mon.ai PACS",
+  "HttpPort" : 8042,
+  "RemoteAccessAllowed" : true,
+  "AuthenticationEnabled" : true,
+  "RegisteredUsers" : {
+    "admin" : "admin"
+  },
+  "Plugins" : [ "/usr/local/share/orthanc/plugins" ],
+  "OrthancExplorer2" : {
+    "Enable" : true,
+    "UiOptions" : {
+      "EnableMainIcons" : true
+    }
+  },
+  "OHIF" : {
+    "Enable" : true
+  }
+}

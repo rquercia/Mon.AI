@@ -1,0 +1,46 @@
+# Node.js
+**/node_modules/
+**/dist/
+**/build/
+.npm
+.yarn-integrity
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Mac OS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Specific - Data and Models (Too large for Git)
+/data/input/*
+!/data/input/.gitkeep
+/data/output/*
+!/data/output/.gitkeep
+/data/ollama/*
+!/data/ollama/.gitkeep
+
+# AI Models (Weights are large)
+/models/**
+!/models/README.md
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Backups
+Mon.ai - copia/
+*.bak
+*.tmp
+
+# Temp
+temp_frontend/

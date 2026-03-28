@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+Generando objeto DICOM SEG real con highdicom desde /opt/monai/output/session_1774229875603_det.nii.gz...
+  File "/opt/monai/scripts/create_dicom_seg.py", line 104, in <module>
+Advertencia: Dimensi├│n Z de m├íscara (291) no coincide con datasets (122).
+    create_seg_object(nifti_mask, orig_dir, out_file)
+  File "/opt/monai/scripts/create_dicom_seg.py", line 50, in create_seg_object
+    algorithm_identification = AlgorithmIdentificationSequence(
+TypeError: AlgorithmIdentificationSequence.__init__() missing 1 required positional argument: 'family'

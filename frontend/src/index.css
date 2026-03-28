@@ -1,0 +1,403 @@
+/* ==========================================================================
+   CSS Variables & Tokens - CMMS Premium Theme
+   ========================================================================== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Fondo General App */
+  --bg-app: #f8fafc;
+  /* Gris muy claro azulado */
+
+  /* Tarjetas y Contenedores */
+  --bg-card: #ffffff;
+  --border-card: #e2e8f0;
+  --shadow-glass: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --radius-card: 16px;
+
+  /* Textos y Títulos */
+  --text-primary: #0f172a;
+  /* Oscuro profundo */
+  --text-secondary: #475569;
+  /* Gris azulado */
+  --text-muted: #64748b;
+  /* Mutado / Table Headers */
+  --font-main: 'Inter', 'Roboto', sans-serif;
+
+  /* Badges y Pastillas (CRÍTICO) */
+  --badge-success-bg: #dcfce7;
+  --badge-success-text: #166534;
+  --badge-warning-bg: #fffbeb;
+  --badge-warning-text: #d97706;
+  /* o #b45309 */
+  --badge-error-bg: #fee2e2;
+  --badge-error-text: #991b1b;
+  --badge-neutral-bg: #f1f5f9;
+  --badge-neutral-text: #475569;
+
+  /* Botones primario / secundario */
+  --btn-primary-bg: #3b82f6;
+  /* Azul moderno (#6366f1 para índigo) */
+  --btn-primary-hover: #2563eb;
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: #f1f5f9;
+  --btn-secondary-border: #cbd5e1;
+  --btn-secondary-text: #475569;
+
+  /* Utilidades compartidas */
+  --radius-button: 8px;
+  /* Opcional: 12px */
+  --radius-badge: 20px;
+  --radius-input: 8px;
+}
+
+/* ==========================================================================
+   Base & Resets
+   ========================================================================== */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-main);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text-primary);
+  font-weight: 800;
+  /* Bold/Extra-bold */
+  margin-top: 0;
+}
+
+p,
+span,
+div {
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Layout / Cards
+   ========================================================================== */
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-glass);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ==========================================================================
+   Tables & Listados
+   ========================================================================== */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-button);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background-color: var(--bg-app);
+  /* #f8fafc */
+  border-bottom: 1px solid var(--border-card);
+  padding: 12px 16px;
+  letter-spacing: 0.05em;
+}
+
+/* Sin bordes verticales excesivos */
+td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-card);
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+/* Filas puras y limpias */
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* Jerarquía visual en la tabla para celdas interiores */
+.td-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+}
+
+.td-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+}
+
+/* ==========================================================================
+   Badges / Status Pills
+   ========================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-badge);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background-color: var(--badge-success-bg);
+  color: var(--badge-success-text);
+}
+
+.badge-warning {
+  background-color: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+}
+
+.badge-error {
+  background-color: var(--badge-error-bg);
+  color: var(--badge-error-text);
+}
+
+.badge-neutral {
+  background-color: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+}
+
+/* ==========================================================================
+   Botonería y Controles
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: var(--radius-button);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border: none;
+  gap: 8px;
+  /* Espacio para el icono de Lucide */
+}
+
+/* Botón Primario */
+.btn-primary {
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+
+.btn-primary:hover {
+  background-color: var(--btn-primary-hover);
+}
+
+.btn-primary * {
+  color: white;
+}
+
+/* Botón Secundario */
+.btn-secondary {
+  background-color: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--btn-secondary-border);
+}
+
+.btn-secondary:hover {
+  background-color: #e2e8f0;
+}
+
+/* ==========================================================================
+   Inputs / Selects (Búsqueda Limpia)
+   ========================================================================== */
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.input-control {
+  width: 100%;
+  padding: 10px 16px;
+  padding-left: 36px;
+  /* Deja espacio para el icono */
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-input);
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background-color: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-control:focus {
+  outline: none;
+  border-color: var(--btn-primary-bg);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  /* Efecto glow sutil */
+}
+
+/* ==========================================================================
+   Navegación tipo Tabs / Pestañas (Interruptores Modernos)
+   ========================================================================== */
+.tabs-container {
+  display: inline-flex;
+  gap: 4px;
+  background-color: transparent;
+  padding: 4px;
+  border-radius: calc(var(--radius-button));
+  /* Fondo muy sutil o contenedor glass */
+  background-color: #f1f5f9;
+}
+
+.tab-btn {
+  padding: 6px 16px;
+  border-radius: calc(var(--radius-button) - 2px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background-color: #ffffff;
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* ==========================================================================
+   App Structure (Side-by-side)
+   ========================================================================== */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 240px;
+  background-color: #1e293b;
+  /* Dark Navy Slate */
+  color: white;
+  padding: 1.5rem;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-bottom: 2.5rem;
+  color: white;
+}
+
+.logo span {
+  color: white;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  text-align: left;
+  font-size: 0.95rem;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: all 0.2s;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.nav-item.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #60a5fa;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 240px;
+  padding: 2.5rem;
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+/* Model Selector specific hover */
+.model-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.model-card.selected {
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
+}
+
+.import-zone {
+  border: 2px dashed #e2e8f0;
+  border-radius: 12px;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  background: #f8fafc;
+}
