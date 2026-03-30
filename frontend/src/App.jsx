@@ -591,10 +591,9 @@ function App() {
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
     const ejecutarSincronizacionGit = async (action) => {
-        window.alert(`!!! ACTIVANDO SINCRONIZACIÓN: ${action} !!!`);
-        console.log(`[GIT_DEBUG_V3] Acción: ${action} | Token: ${githubToken ? 'PRESENTE' : 'VACÍO'}`);
+        console.log(`[GIT_SYNC] Iniciando: ${action}`);
         localStorage.setItem('github_token', githubToken);
-        setGitLogs(`> [V3] MONITOR DE SINCRONIZACIÓN INICIADO\n> Conectando con servidor para: ${action}...\n`);
+        setGitLogs(`> INICIANDO PROCESO DE SINCRONIZACIÓN (${action})\n> Conectando con servidor Mon.AI...\n`);
         setShowGitLogModal(true);
         setIsGitLoading(true);
         
@@ -1402,84 +1401,102 @@ function App() {
                     {activeTab === 'config' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="card" style={{ 
-                                background: 'linear-gradient(135deg, #ff8c00 0%, #ff4500 100%)', 
-                                color: 'white',
-                                border: 'none',
-                                padding: '30px',
+                                background: 'white', 
+                                border: '1px solid #e2e8f0',
+                                padding: '40px',
                                 borderRadius: '24px',
-                                boxShadow: '0 20px 40px rgba(255, 69, 0, 0.3)'
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-                                    <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '10px', borderRadius: '15px' }}>
-                                        <Server size={32} color="white" />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '30px', borderBottom: '1px solid #f1f5f9', paddingBottom: '20px' }}>
+                                    <div style={{ backgroundColor: '#eff6ff', padding: '15px', borderRadius: '16px', color: '#3b82f6' }}>
+                                        <Server size={32} />
                                     </div>
                                     <div>
-                                        <h2 style={{ margin: 0, fontSize: '2.5rem', fontWeight: '900', color: 'yellow' }}>SISTEMA GIT v3.0</h2>
-                                        <p style={{ margin: 0, opacity: 1, fontSize: '1rem', fontWeight: 'bold' }}>CONTROL DE EMERGENCIA PARA SINCRONIZACIÓN</p>
+                                        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800', color: '#0f172a' }}>Sincronización con GitHub</h2>
+                                        <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>Ecosistema de desarrollo Mon.AI Cloud</p>
                                     </div>
                                 </div>
 
-                                <div style={{ backgroundColor: 'rgba(0,0,0,0.1)', padding: '15px 20px', borderRadius: '16px', marginBottom: '15px', border: '1px solid rgba(255,255,255,0.2)' }}>
-                                    <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.7, marginBottom: '4px' }}>Repositorio Remoto</div>
-                                    <div style={{ fontFamily: 'monospace', fontSize: '1.1rem' }}>https://github.com/rquercia/Mon.AI</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
+                                    <div style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px', letterSpacing: '0.5px' }}>Repositorio Remoto</div>
+                                        <div style={{ fontFamily: 'monospace', fontSize: '1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></div>
+                                            https://github.com/rquercia/Mon.AI
+                                        </div>
+                                    </div>
+
+                                    <div style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px', letterSpacing: '0.5px' }}>OAuth Identity</div>
+                                        <div style={{ fontSize: '1rem', color: '#0f172a', fontWeight: '600' }}>rquercia</div>
+                                    </div>
                                 </div>
 
-                                <div style={{ marginBottom: '25px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.7, display: 'block', marginBottom: '8px' }}>GitHub Personal Access Token (PAT)</label>
-                                    <input 
-                                        type="password" 
-                                        value={githubToken}
-                                        onChange={(e) => setGithubToken(e.target.value)}
-                                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxx"
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 16px',
-                                            borderRadius: '10px',
-                                            border: '1px solid rgba(255,255,255,0.3)',
-                                            backgroundColor: 'rgba(255,255,255,0.1)',
-                                            color: 'white',
-                                            outline: 'none'
-                                        }}
-                                    />
-                                    <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', marginTop: '6px' }}>* El token se guarda de forma segura en tu navegador local.</p>
+                                <div style={{ marginBottom: '35px', maxWidth: '600px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#1e293b', display: 'block', marginBottom: '10px' }}>GitHub Personal Access Token (PAT)</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input 
+                                            type="password" 
+                                            value={githubToken}
+                                            onChange={(e) => setGithubToken(e.target.value)}
+                                            placeholder="Introduce tu token ghp_..."
+                                            style={{
+                                                width: '100%',
+                                                padding: '14px 16px',
+                                                borderRadius: '12px',
+                                                border: '1px solid #cbd5e1',
+                                                backgroundColor: 'white',
+                                                color: '#0f172a',
+                                                outline: 'none',
+                                                fontSize: '14px',
+                                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+                                            }}
+                                        />
+                                    </div>
+                                    <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '8px' }}>
+                                        Este token se utiliza únicamente para autorizar la subida de código al repositorio Mon.AI.
+                                    </p>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '20px', marginTop: '30px' }}>
+                                <div style={{ display: 'flex', gap: '15px' }}>
                                     <button 
                                         onClick={() => ejecutarSincronizacionGit('push')}
+                                        className="btn btn-primary"
                                         style={{ 
                                             flex: 1, 
-                                            backgroundColor: '#ff0000', 
-                                            color: '#ffffff', 
-                                            fontWeight: '900', 
-                                            padding: '30px',
-                                            borderRadius: '0px',
-                                            cursor: 'pointer',
-                                            border: '5px solid white',
-                                            fontSize: '1.5rem',
-                                            textTransform: 'uppercase',
-                                            boxShadow: '10px 10px 0px rgba(0,0,0,0.5)'
+                                            padding: '18px',
+                                            borderRadius: '12px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '12px',
+                                            fontWeight: '700',
+                                            fontSize: '1rem',
+                                            backgroundColor: '#3b82f6',
+                                            boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)'
                                         }}
                                     >
-                                        ¡PUSHEAR AHORA!
+                                        <UploadCloud size={20} /> Enviar Cambios a GitHub
                                     </button>
                                     <button 
                                         onClick={() => ejecutarSincronizacionGit('pull')}
+                                        className="btn btn-secondary"
                                         style={{ 
                                             flex: 1, 
-                                            backgroundColor: '#000000', 
-                                            color: '#ffffff', 
-                                            fontWeight: '900', 
-                                            padding: '30px',
-                                            borderRadius: '0px',
-                                            cursor: 'pointer',
-                                            border: '5px solid white',
-                                            fontSize: '1.5rem',
-                                            textTransform: 'uppercase',
-                                            boxShadow: '10px 10px 0px rgba(0,0,0,0.5)'
+                                            padding: '18px',
+                                            borderRadius: '12px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '12px',
+                                            fontWeight: '700',
+                                            fontSize: '1rem',
+                                            backgroundColor: '#f1f5f9',
+                                            color: '#1e293b',
+                                            border: '1px solid #e2e8f0'
                                         }}
                                     >
-                                        PULL FORZADO
+                                        <Activity size={20} style={{ transform: 'rotate(180deg)' }} /> Descargar Actualizaciones
                                     </button>
                                 </div>
                             </div>
