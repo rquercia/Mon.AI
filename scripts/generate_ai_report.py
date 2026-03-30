@@ -31,13 +31,13 @@ def generate_report(json_path):
     
     # 3. Consultar a Ollama / MedGemma Q8
     client = ollama.Client(host='http://monai_llm:11434')
-    MODEL_NAME = 'MedAIBase/MedGemma1.5:4b'
+    MODEL_NAME = 'dcarrascosa/medgemma-1.5-4b-it:q8_0'
     
     try:
         response = client.chat(model=MODEL_NAME, messages=[
           {'role': 'system', 'content': 'Eres MedGemma, un radiólogo asistente clínico avanzado de IA. Redacta informes estructurados en español altamente profesionales.'},
           {'role': 'user', 'content': prompt}
-        ])
+        ], options={'temperature': 0.0})
         
         # OJO: Solo imprimimos el texto para que el child_process de Node.js lo capture limpio
         print(response['message']['content'])

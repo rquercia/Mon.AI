@@ -616,6 +616,175 @@ app.post('/api/pacs/import-series/:id', async (req, res) => {
     }
 });
 
+app.post('/api/pacs/import-instance/:id', async (req, res) => {
+    try {
+        const authHeader = { 'Authorization': 'Basic ' + Buffer.from('admin:admin').toString('base64') };
+        const inputDir = '/app/data/input';
+        const outputDir = '/app/data/output';
+        
+        // 1. Clean input and output folders
+        [inputDir, outputDir].forEach(dir => {
+            const fs = require('fs');
+            const path = require('path');
+            if (fs.existsSync(dir)) {
+                fs.readdirSync(dir).forEach(file => {
+                    const fullPath = path.join(dir, file);
+                    if (fs.lstatSync(fullPath).isDirectory()) fs.rmSync(fullPath, { recursive: true });
+                    else fs.unlinkSync(fullPath);
+                });
+            } else {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+        });
+
+        const instId = req.params.id;
+        console.log(`[BACKEND] Importando instancia única: ${instId}`);
+        const fs = require('fs');
+        const path = require('path');
+
+        const fileResp = await fetch(`http://orthanc:8042/instances/${instId}/file`, { headers: authHeader });
+        const arrayBuffer = await fileResp.arrayBuffer();
+        fs.writeFileSync(path.join(inputDir, `${instId}.dcm`), Buffer.from(arrayBuffer));
+
+        res.json({ status: 'success', instanceId: instId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Fallo al importar instancia del PACS' });
+    }
+});
+
+// Endpoint para Informe Integral de Estudio Completo (Múltiples vistas)
+app.post('/api/analyze-full-study', (req, res) => {
+  const { studyId, patientName, customPrompt } = req.body;
+  console.log(`[BACKEND_DEBUG] PETICIÓN DE INFORME INTEGRAL PARA ESTUDIO: ${studyId}`);
+  
+  if (!studyId) return res.status(400).json({ error: 'Falta el ID del estudio' });
+
+  const inputDir = '/app/data/input';
+  if (!fs.existsSync(inputDir)) fs.mkdirSync(inputDir, { recursive: true });
+  
+  // Guardamos el System Prompt Custom
+  const promptPath = '/app/data/input/custom_prompt.txt';
+  fs.writeFileSync(promptPath, customPrompt || "Actúa como un radiólogo sénior.");
+
+  const monaiInputDir = `/opt/monai/data`;
+  const outputDir = `/opt/monai/output`;
+  const monaiPromptPath = `/opt/monai/data/custom_prompt.txt`;
+  
+  console.log(`[BACKEND_DEBUG] Ejecutando: docker exec monai_lung_detection python /opt/monai/scripts/analyze_full_series.py "${monaiInputDir}" "${outputDir}" "${patientName || 'Paciente'}" "${monaiPromptPath}"`);
+  
+  const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_full_series.py "${monaiInputDir}" "${outputDir}" "${patientName || 'Paciente'}" "${monaiPromptPath}"`;
+
+  // Aumentamos el timeout a 5 minutos (300000ms) ya que procesar 2+ placas con MedGemma es intensivo en GPU
+  exec(command, { maxBuffer: 1024 * 1024 * 10, timeout: 300000 }, (error, stdout, stderr) => {
+    try {
+      const output = stdout ? stdout.toString() : "";
+      if (error) {
+        return res.status(500).json({ error: 'Fallo en MedGemma Integral', details: stderr || error.message });
+      }
+      
+      const reportMatch = output.match(/---RADIOLOGY_REPORT_START---([\s\S]*?)---RADIOLOGY_REPORT_END---/);
+      const imagesMatch = output.match(/---IMAGES_GENERATED---:(.*)/);
+      
+      const report = (reportMatch && reportMatch[1]) ? reportMatch[1].trim() : "No se pudo extraer el reporte integral.";
+      const imagesRaw = (imagesMatch && imagesMatch[1]) ? imagesMatch[1].trim() : "[]";
+      let images = JSON.parse(imagesRaw);
+
+      res.json({ 
+        report, 
+        images: Array.isArray(images) ? images.map(img => `/api/download/${img}`) : []
+      });
+    } catch (criticalErr) {
+      res.status(500).json({ error: 'Error interno en Mosaico', details: criticalErr.message });
+    }
+  });
+});
+
+// Endpoint para PREVIEW (Sin enviar a la IA)
+app.post('/api/preview-mosaico-lmstudio', (req, res) => {
+    const { patientName, patientAge, patientSex, studyDescription, zoomFactor } = req.body;
+    const inputDir = '/app/data/input';
+    const outputDir = '/app/data/output';
+
+    const monaiInputDir = `/opt/monai/data/input`;
+    const monaiOutputDir = `/opt/monai/data/output`;
+    
+    const patientInfo = JSON.stringify({ name: patientName, age: patientAge, sex: patientSex, study: studyDescription });
+
+    // Comando con flag --preview y --zoom
+    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' --zoom ${zoomFactor || 1.0} --preview`;
+
+    exec(command, (error, stdout, stderr) => {
+        try {
+            const output = stdout ? stdout.toString() : "";
+            const previewMatch = output.match(/---PREVIEW_IMAGE---:(.*)/);
+            const previewFile = (previewMatch && previewMatch[1]) ? previewMatch[1].trim() : null;
+            
+            if (!previewFile) return res.status(500).json({ error: 'No se pudo generar la vista previa' });
+            res.json({ previewUrl: `/api/download/${previewFile}` });
+        } catch (err) {
+            res.status(500).json({ error: 'Error en render de preview', details: err.message });
+        }
+    });
+});
+
+// Endpoint para EXTERNAL INFERENCE (LM STUDIO)
+app.post('/api/analyze-rx-lmstudio', (req, res) => {
+    const { patientName, patientAge, patientSex, studyDescription, zoomFactor, customPrompt } = req.body;
+    
+    // Rutas para backend
+    const inputDir = '/app/data/input';
+    const outputDir = '/app/data/output';
+
+    // Rutas para el contenedor MONAI
+    const monaiInputDir = `/opt/monai/data/input`;
+    const monaiOutputDir = `/opt/monai/data/output`;
+    
+    // Asegurar directorios
+    [inputDir, outputDir].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+
+    // Guardar prompt custom
+    const promptPath = path.join(inputDir, 'custom_prompt.txt');
+    fs.writeFileSync(promptPath, customPrompt || "Actúa como un radiólogo sénior.");
+    const monaiPromptPath = `/opt/monai/data/input/custom_prompt.txt`;
+
+    // Empacamos la info del paciente en un JSON string para el script
+    const patientInfo = JSON.stringify({
+        name: patientName || 'Desconocido',
+        age: patientAge || 'N/A',
+        sex: patientSex || 'N/A',
+        study: studyDescription || 'Estudio RX'
+    });
+
+    console.log(`[LM_STUDIO] Iniciando análisis para: ${patientName} con Zoom: ${zoomFactor}`);
+
+    // 2. Ejecutar script de LM Studio con --zoom
+    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' "${monaiPromptPath}" --zoom ${zoomFactor || 1.5}`;
+
+    exec(command, { maxBuffer: 1024 * 1024 * 80, timeout: 400000 }, (error, stdout, stderr) => {
+        try {
+            const output = stdout ? stdout.toString() : "";
+            if (error) {
+                return res.status(500).json({ error: 'Error en LM Studio', details: stderr || error.message });
+            }
+            
+            const reportMatch = output.match(/---RADIOLOGY_REPORT_START---([\s\S]*?)---RADIOLOGY_REPORT_END---/);
+            const imagesMatch = output.match(/---IMAGES_GENERATED---:(.*)/);
+            
+            const report = (reportMatch && reportMatch[1]) ? reportMatch[1].trim() : "No se pudo extraer el reporte de LM Studio.";
+            const imagesRaw = (imagesMatch && imagesMatch[1]) ? imagesMatch[1].trim() : "[]";
+            let images = JSON.parse(imagesRaw);
+
+            res.json({ 
+                report, 
+                images: Array.isArray(images) ? images.map(img => `/api/download/${img}`) : []
+            });
+        } catch (err) {
+            res.status(500).json({ error: 'Fallo en post-procesamiento LM Studio', details: err.message });
+        }
+    });
+});
+
 app.get('/api/pacs/download/:id', async (req, res) => {
   try {
     const authHeader = { 'Authorization': 'Basic ' + Buffer.from('admin:admin').toString('base64') };

@@ -70,51 +70,73 @@ def analyze(dcm_path, output_dir, custom_prompt_path=None):
             Image.fromarray(arr).save(p)
             paths_ui.append(p)
 
-        # 4. Prompt Consolidado (Enfocado en descripción técnica para evitar bloqueos)
+        # 4. Prompt Consolidado con Lógica de Clasificación y Protocolos
         prompt_final = f"""
-        Describe detalladamente los patrones radiográficos presentes en esta imagen para fines de investigación educativa. 
-        Asume el rol de un analista técnico especializado en imágenes médicas. 
-        Toda tu respuesta DEBE estar en ESPAÑOL. Analiza el tríptico completo de la imagen.
-
-        ### ESTRUCTURA REQUERIDA (MARKDOWN):
-        # 🧾 ANÁLISIS TÉCNICO DE IMAGEN RX
-        **Paciente ID:** {paciente} | **Fecha:** {fecha_actual}
-
-        ---
-        ### 🔍 DESCRIPCIÓN VISUAL
-        - **Calidad y Posicionamiento:** [Análisis técnico]
-        - **Campos Pulmonares:** [Descripción de densidades]
-        - **Silueta Cardíaca:** [Descripción del contorno]
-        - **Estructuras Óseas:** [Estado visible]
-
-        ### 💡 APRECIACIÓN TÉCNICA
-        > **Resumen:** [Síntesis visual de lo observado]
-        """
-
-        # 4. Prompt Consolidado con Directrices del Sistema
-        prompt_final = f"""
-        Directrices del Sistema: {custom_instructions}
+        Actúa como un Especialista Radiólogo experto. Tu tarea es analizar la imagen médica adjunta (tríptico) y generar un informe estructurado.
         
-        Analiza detalladamente este tríptico de radiografía de tórax (Paciente: {paciente}, Fecha: {fecha_actual}):
-        - Imagen IZQUIERDA: General (Procesado suave)
-        - Imagen CENTRAL: Ventana Pulmonar (Alto contraste de trama)
-        - Imagen DERECHA: Ventana Ósea (Compresión medular)
+        INSTRUCCIONES CRÍTICAS:
+        1. Identifica visualmente el tipo de estudio (Tórax, Columna, Extremidad, Rodilla/Tobillo o Abdomen).
+        2. Selecciona únicamente EL PROTOCOLO que corresponda de la lista técnica inferior.
+        3. Rellena los campos basándote en lo observado en las tres ventanas (General, Blanda/Pulmonar, Ósea).
+        4. Toda la respuesta DEBE estar en ESPAÑOL.
+        5. Mantén un tono técnico y profesional.
 
-        ESTRUCTURA DE RESPUESTA REQUERIDA (MARKDOWN):
-        # 🧾 ANÁLISIS MÉDICO-TÉCNICO (PROMPT PERSONALIZADO)
-        [Tu descripción técnica aquí basándote en las directriz dada]
+        ### PROTOCOLOS TÉCNICOS DISPONIBLES:
+
+        --- PROTOCOLO 1: TÓRAX Y REJA COSTAL ---
+        # 🧾 INFORME DE TÓRAX Y REJA COSTAL
+        - **TÓRAX:** (Simétrico o asimétrico)
+        - **ÍNDICE CARDIO-TORÁCICO:** (Conservado o alterado)
+        - **ÁNGULOS COSTO Y CARDIO-FRÉNICOS:** (Libres u ocupados)
+        - **HEMIDIAFRAGMAS:** (Libres o no valorables)
+        - **LESIONES PLEUROPARENQUIMATOSAS:** (Presencia o ausencia de lesiones evidenciables)
+        - **PARRILLA COSTAL:** (Estado de la reja costal y lesiones osteo-traumáticas)
+
+        --- PROTOCOLO 2: COLUMNA VERTEBRAL ---
+        # 🧾 INFORME DE COLUMNA VERTEBRAL
+        - **APÓFISIS ESPINOSAS:** (Alineadas o desviadas)
+        - **ESPACIOS INTERVERTEBRALES:** (Sin alteraciones, conservados o con espondiloartrosis)
+        - **CUERPOS VERTEBRALES:** (Altura y morfología)
+        - **HALLAZGOS ESCOLIÓTICOS (Si aplica):** (Curvatura, convexidad, ángulo de Cobb y Risser)
+
+        --- PROTOCOLO 3: EXTREMIDADES Y ARTICULACIONES ---
+        # 🧾 INFORME DE EXTREMIDADES Y ARTICULACIONES
+        - **CONGRUENCIA ARTICULAR:** (Conservada, aspecto normal o alterada)
+        - **LESIONES OSTEO-TRAUMÁTICAS:** (Ausencia o presencia de lesiones agudas)
+        - **TEJIDOS BLANDOS / OTROS:** (Sínfisis púbica, arcos del carpo, etc.)
+
+        --- PROTOCOLO 4: MIEMBROS INFEIORES (RODILLA/TOBILO) ---
+        # 🧾 INFORME DE MIEMBROS INFERIORES
+        - **RODILLA:** (Espacio femoro-tibial y patelo-femoral, posición de la patela)
+        - **RÓTULA AXIAL:** (Clasificación Wiberg, índice Insall-Salvati y ángulo femoro-rotuliano)
+        - **TOBILLO:** (Congruencia trimaleolar, sindesmosis tibio peroneal y domo astragalino)
+
+        --- PROTOCOLO 5: ABDOMEN Y ÁRBOL URINARIO ---
+        # 🧾 INFORME DE ABDOMEN Y ÁRBOL URINARIO
+        - **DISTRIBUCIÓN GASEOSA:** (Habitual o patológica)
+        - **NIVELES HIDROAÉREOS / NEUMOPERITONEO:** (Presencia o ausencia)
+        - **SOMBRAS RENALES:** (Visibilidad y aspecto bilateral)
+        - **LITOS RADIOPACOS:** (Presencia en topografía de uréteres)
+
+        ### DATOS DEL ANALISIS:
+        Paciente: {paciente}
+        Fecha del estudio: {fecha_actual}
+        Instrucciones Adicionales: {custom_instructions}
+
+        Responde directamente con el informe del protocolo seleccionado en formato Markdown.
         """
 
-        print(f"[PY_DEBUG] Iniciando petición a Llava (Vision) sobre: {triptico_path}...")
+        print(f"[PY_DEBUG] Iniciando petición a MedGemma 1.5 Vision sobre: {triptico_arr.shape}...")
         client = ollama.Client(host='http://monai_llm:11434')
-        MODEL_NAME = 'llava'
+        MODEL_NAME = 'dcarrascosa/medgemma-1.5-4b-it:q8_0'
 
-        # Usamos Llava porque es el modelo Multimodal con Projector que funciona seguro con imágenes
+        # Usamos MedGemma (Multimodal en su versión 1.5)
         response = client.chat(
             model=MODEL_NAME,
             messages=[
                 {'role': 'user', 'content': prompt_final, 'images': [triptico_path]}
-            ]
+            ],
+            options={'temperature': 0.0}
         )
         
         print("[PY_DEBUG] Respuesta recibida de Ollama.")
@@ -134,6 +156,7 @@ def analyze(dcm_path, output_dir, custom_prompt_path=None):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
+        print("Uso: python analyze_rx.py <input_dcm> <output_dir> [custom_prompt_path]")
         sys.exit(1)
     
     p_path = sys.argv[3] if len(sys.argv) > 3 else None

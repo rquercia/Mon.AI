@@ -10,7 +10,8 @@ import {
     AlertCircle,
     Layers,
     Database,
-    Stethoscope
+    Stethoscope,
+    Server
 } from 'lucide-react';
 import { DicomProvider } from './context/DicomContext';
 import EspinografiaSidebar from './components/EspinografiaSidebar';
@@ -450,13 +451,13 @@ function App() {
         await handleClearAiMemory(false);
         
         setAiWorkflowStatus('loading');
-        setMessage({ type: 'neutral', text: 'Paso 1: Cargando Llava en VRAM...' });
+        setMessage({ type: 'neutral', text: 'Paso 1: Cargando MedGemma 1.5 en VRAM...' });
         
         try {
             const resp = await fetch('http://localhost:809/api/ai-load', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: 'llava' })
+                body: JSON.stringify({ model: 'dcarrascosa/medgemma-1.5-4b-it:q8_0' })
             });
             if (resp.ok) {
                 setAiWorkflowStatus('ready');
@@ -472,15 +473,194 @@ function App() {
         setSelectedStudy(study);
         setPacsLoading(true);
         try {
-            const response = await fetch(`http://localhost:809/api/pacs/study-series/${study.ID}`);
-            if (response.ok) {
-                const data = await response.json();
-                setPacsSeries(data);
+            // Buscamos tanto las series (para identificar proyecciones) como las instancias (imágenes reales)
+            const [seriesResp, instancesResp] = await Promise.all([
+                fetch(`http://localhost:809/api/pacs/study-series/${study.ID}`),
+                fetch(`http://localhost:809/api/pacs/study-instances/${study.ID}`)
+            ]);
+            
+            if (seriesResp.ok && instancesResp.ok) {
+                const seriesData = await seriesResp.json();
+                const instancesData = await instancesResp.json();
+                
+                setPacsSeries(seriesData);
+                // Mapeamos las instancias para tener una lista visual
+                setPacsInstances(instancesData);
+            }
+        } catch (error) {
+            console.error("[GUI_ERROR] Error cargando detalle del estudio:", error);
+        } finally {
+            setPacsLoading(false);
+        }
+    };
+
+    const [pacsInstances, setPacsInstances] = useState([]);
+
+    const handleAnalyzeInstance = async (instanceId) => {
+        setIsAnalyzingRx(true);
+        setMessage({ type: 'neutral', text: 'Importando imagen específica...' });
+        setRxResults({ report: '', images: [] });
+        setAiWorkflowStatus('analyzing');
+        
+        try {
+            // 1. Importar la instancia única
+            const importResp = await fetch(`http://localhost:809/api/pacs/import-instance/${instanceId}`, { method: 'POST' });
+            if (!importResp.ok) throw new Error("Fallo al importar imagen.");
+
+            setMessage({ type: 'neutral', text: 'Analizando con MedGemma... espera unos segundos.' });
+            
+            // 2. Analizar con el endpoint existente
+            const analyzeResp = await fetch('http://localhost:809/api/analyze-rx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    seriesId: instanceId, // Usamos el ID como identificador para logs
+                    customPrompt: customSystemPrompt 
+                })
+            });
+
+            if (analyzeResp.ok) {
+                const data = await analyzeResp.json();
+                setRxResults(data);
+                setMessage({ type: 'success', text: 'Análisis completado exitosamente.' });
+            } else {
+                const err = await analyzeResp.json();
+                setRxResults({ report: `⚠️ **ERROR IA:** ${err.error}\n${err.details}`, images: [] });
+                setMessage({ type: 'error', text: 'Error en respuesta de IA.' });
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage({ type: 'error', text: `Error: ${error.message}` });
+        } finally {
+            setIsAnalyzingRx(false);
+            setAiWorkflowStatus('idle');
+        }
+    };
+    
+    const handleAnalyzeFullStudy = async () => {
+        if (!selectedStudy || pacsInstances.length === 0) return;
+        
+        setIsAnalyzingRx(true);
+        setMessage({ type: 'neutral', text: `Iniciando Informe Integral del Estudio (${pacsInstances.length} placas)...` });
+        setRxResults({ report: '', images: [] });
+        setAiWorkflowStatus('analyzing');
+        
+        try {
+            // 1. Importar TODAS las imágenes del estudio primero
+            // Reutilizamos el endpoint de importar serie del estudio completo
+            const importResp = await fetch(`http://localhost:809/api/pacs/import-series/${pacsSeries[0].ID}`, { method: 'POST' });
+            if (!importResp.ok) throw new Error("Fallo al importar el set completo de imágenes.");
+
+            setMessage({ type: 'neutral', text: 'Generando Mosaico Clínico y analizando... esto tardará un poco más.' });
+            
+            // 2. Analizar Estudio Completo con MedGemma
+            const analyzeResp = await fetch('http://localhost:809/api/analyze-full-study', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    studyId: selectedStudy.ID,
+                    patientName: selectedStudy.PatientMainDicomTags?.PatientName || selectedStudy.MainDicomTags?.PatientName,
+                    customPrompt: customSystemPrompt 
+                })
+            });
+
+            if (analyzeResp.ok) {
+                const data = await analyzeResp.json();
+                setRxResults(data);
+                setMessage({ type: 'success', text: 'Informe Integral completado.' });
+            } else {
+                const err = await analyzeResp.json();
+                setRxResults({ report: `⚠️ **ERROR INTEGRAL:** ${err.error}\n${err.details}`, images: [] });
+                setMessage({ type: 'error', text: 'Error en análisis integral.' });
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage({ type: 'error', text: `Error: ${error.message}` });
+        } finally {
+            setIsAnalyzingRx(false);
+            setAiWorkflowStatus('idle');
+        }
+    };
+
+    const [zoomFactor, setZoomFactor] = useState(1.0);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+    const handleGeneratePreview = async () => {
+        setIsPreviewLoading(true);
+        try {
+            // Importar primero si no hay nada
+            if (pacsInstances.length > 0) {
+                await fetch(`http://localhost:809/api/pacs/import-series/${pacsSeries[0].ID}`, { method: 'POST' });
+            }
+
+            const resp = await fetch('http://localhost:809/api/preview-mosaico-lmstudio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    patientName: selectedStudy?.PatientMainDicomTags?.PatientName,
+                    patientAge: selectedStudy?.PatientMainDicomTags?.PatientAge,
+                    patientSex: selectedStudy?.PatientMainDicomTags?.PatientSex,
+                    studyDescription: selectedStudy?.MainDicomTags?.StudyDescription,
+                    zoomFactor 
+                })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                setPreviewUrl(`http://localhost:809${data.previewUrl}`);
             }
         } catch (error) {
             console.error(error);
         } finally {
-            setPacsLoading(false);
+            setIsPreviewLoading(false);
+        }
+    };
+
+    const handleAnalyzeLMStudio = async (instanceId = null) => {
+        setIsAnalyzingRx(true);
+        setMessage({ type: 'neutral', text: 'Enviando a LM Studio con zoom personalizado...' });
+        setRxResults({ report: '', images: [] });
+        setAiWorkflowStatus('analyzing');
+        
+        try {
+            // 1. Importar la(s) imagen(es)
+            let importUrl = `http://localhost:809/api/pacs/import-series/${pacsSeries[0].ID}`;
+            if (instanceId) {
+                importUrl = `http://localhost:809/api/pacs/import-instance/${instanceId}`;
+            }
+            const importResp = await fetch(importUrl, { method: 'POST' });
+            if (!importResp.ok) throw new Error("Fallo al importar imágenes.");
+
+            setMessage({ type: 'neutral', text: 'Análisis en curso en LM Studio...' });
+            
+            const analyzeResp = await fetch('http://localhost:809/api/analyze-rx-lmstudio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    patientName: selectedStudy?.PatientMainDicomTags?.PatientName || selectedStudy?.MainDicomTags?.PatientName || "Paciente",
+                    patientAge: selectedStudy?.PatientMainDicomTags?.PatientAge,
+                    patientSex: selectedStudy?.PatientMainDicomTags?.PatientSex,
+                    studyDescription: selectedStudy?.MainDicomTags?.StudyDescription,
+                    zoomFactor: zoomFactor,
+                    customPrompt: customSystemPrompt 
+                })
+            });
+
+            if (analyzeResp.ok) {
+                const data = await analyzeResp.json();
+                setRxResults(data);
+                setMessage({ type: 'success', text: 'Análisis LM Studio completado.' });
+            } else {
+                const err = await analyzeResp.json();
+                setRxResults({ report: `⚠️ **ERROR LM STUDIO:** ${err.error}\n${err.details}`, images: [] });
+                setMessage({ type: 'error', text: 'Error en respuesta de LM Studio.' });
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage({ type: 'error', text: `Error: ${error.message}` });
+        } finally {
+            setIsAnalyzingRx(false);
+            setAiWorkflowStatus('idle');
         }
     };
 
@@ -795,10 +975,23 @@ function App() {
                                                 <tr><td colSpan="3" className="p-8 text-center text-slate-400 italic">No hay estudios RX cargados hoy</td></tr>
                                             ) : (
                                                 pacsStudies.map(study => (
-                                                    <tr key={study.ID} className="border-t hover:bg-slate-50" onClick={() => handleSelectStudy(study)} style={{ cursor: 'pointer' }}>
+                                                    <tr key={study.ID} className="border-t hover:bg-slate-50 transition-colors" onClick={() => handleSelectStudy(study)} style={{ cursor: 'pointer' }}>
                                                         <td className="p-3">
-                                                            <div className="font-bold">{study.MainDicomTags.PatientName}</div>
-                                                            <div className="text-[10px] text-slate-500">{study.MainDicomTags.StudyDate}</div>
+                                                            <div className="font-bold text-indigo-700">
+                                                                {study.PatientMainDicomTags?.PatientName || study.MainDicomTags?.PatientName || study.ID.substring(0,8)}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-500 flex flex-col gap-0.5">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="bg-slate-100 px-1 rounded font-medium text-slate-600">ID: {study.PatientMainDicomTags?.PatientID || study.MainDicomTags?.PatientID || "S/N"}</span>
+                                                                    <span>•</span>
+                                                                    <span>{study.MainDicomTags?.StudyDate || "Sin Fecha"}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 opacity-80">
+                                                                    <span className="uppercase">{study.PatientMainDicomTags?.PatientSex || "S/X"}</span>
+                                                                    <span>•</span>
+                                                                    <span>{study.PatientMainDicomTags?.PatientAge || "Edad N/A"}</span>
+                                                                </div>
+                                                            </div>
                                                         </td>
                                                         <td className="p-3">
                                                             <div className="truncate max-w-[200px]">{study.MainDicomTags.StudyDescription}</div>
@@ -819,22 +1012,95 @@ function App() {
                                 </div>
 
                                 {selectedStudy && (
-                                    <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                                        <h4 className="text-blue-800 text-sm font-bold mb-2">Series del Estudio</h4>
-                                        <div className="space-y-2">
-                                            {pacsSeries.map(series => (
-                                                <div key={series.ID} className="flex justify-between items-center bg-white p-2 rounded border border-blue-200">
-                                                    <div>
-                                                        <span className="text-xs font-bold text-slate-700">Serie {series.MainDicomTags.SeriesNumber}</span>
-                                                        <span className="mx-2 text-xs text-slate-400">|</span>
-                                                        <span className="text-xs text-slate-500">{series.Instances.length} img</span>
+                                    <div className="mt-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="text-blue-800 text-sm font-bold">Imágenes del Estudio</h4>
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-lg shadow-indigo-200 transition-all flex items-center gap-1"
+                                                    onClick={handleAnalyzeFullStudy}
+                                                    disabled={isAnalyzingRx || pacsInstances.length === 0}
+                                                >
+                                                    <Activity size={12} /> INFORME INTEGRAL
+                                                </button>
+                                                <button 
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-3 py-1 rounded-full font-bold shadow-lg shadow-emerald-200 transition-all flex items-center gap-1"
+                                                    onClick={() => handleAnalyzeLMStudio()}
+                                                    disabled={isAnalyzingRx || pacsInstances.length === 0}
+                                                >
+                                                    <Server size={12} /> LM STUDIO
+                                                </button>
+                                                <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-bold">
+                                                    {pacsInstances.length} RX
+                                                </span>
+                                            </div>
+
+                                            {/* BARRA DE ZOOM Y PREVIEW */}
+                                            <div className="bg-gray-50 border-t border-gray-100 p-4 space-y-4">
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                                                            <Layers size={12} /> Control de Zoom (Tríptico)
+                                                        </span>
+                                                        <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                                                            {zoomFactor.toFixed(1)}x
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-4">
+                                                        <input 
+                                                            type="range" 
+                                                            min="0.1" 
+                                                            max="2.0" 
+                                                            step="0.05" 
+                                                            value={zoomFactor}
+                                                            onChange={(e) => setZoomFactor(parseFloat(e.target.value))}
+                                                            className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                                        />
+                                                        <button 
+                                                            className="text-[10px] bg-white border border-gray-200 px-3 py-1 rounded-md font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+                                                            onClick={handleGeneratePreview}
+                                                            disabled={isPreviewLoading}
+                                                        >
+                                                            {isPreviewLoading ? 'GENERANDO...' : 'VER TRÍPTICO'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {previewUrl && (
+                                                    <div className="relative group rounded-xl overflow-hidden border-2 border-emerald-100 shadow-inner bg-white">
+                                                        <img 
+                                                            src={previewUrl} 
+                                                            alt="Preview Tríptico" 
+                                                            className="w-full h-auto object-contain max-h-[250px] transition-transform duration-500 group-hover:scale-110"
+                                                        />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                                            <span className="text-[9px] text-white font-bold tracking-widest uppercase">Vista Previa del Análisis</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                            {pacsInstances.map((instId, index) => (
+                                                <div key={instId} className="bg-white p-2 rounded-lg border border-blue-100 shadow-sm flex flex-col group hover:ring-2 hover:ring-blue-400 transition-all">
+                                                    <div className="aspect-square bg-black rounded overflow-hidden relative mb-2">
+                                                        <img 
+                                                            src={`http://localhost:8282/instances/${instId}/preview`} 
+                                                            alt={`Img ${index}`} 
+                                                            className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-opacity"
+                                                            loading="lazy"
+                                                        />
+                                                        <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
+                                                            IMG {index + 1}
+                                                        </div>
                                                     </div>
                                                     <button 
-                                                        className="btn btn-primary btn-sm px-4"
-                                                        onClick={() => handleAnalyzeRxWithMedGemma(series)}
+                                                        className="btn btn-primary btn-sm w-full py-1.5 text-[11px]"
+                                                        onClick={() => handleAnalyzeInstance(instId)}
                                                         disabled={isAnalyzingRx}
                                                     >
-                                                        {isAnalyzingRx ? 'Analizando...' : 'Analizar RX'}
+                                                        {isAnalyzingRx ? '...' : 'Analizar RX'}
                                                     </button>
                                                 </div>
                                             ))}
@@ -1024,7 +1290,16 @@ function App() {
                                                     ) : (
                                                         pacsStudies.map(study => (
                                                             <tr key={study.ID} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover:bg-slate-50 transition-colors">
-                                                                <td style={{ padding: '12px', fontWeight: 'bold' }}>{study.PatientMainDicomTags?.PatientName || study.MainDicomTags?.PatientName || "N/A"}</td>
+                                                                <td style={{ padding: '12px' }}>
+                                                                    <div style={{ fontWeight: 'bold', color: '#4338ca' }}>
+                                                                        {study.PatientMainDicomTags?.PatientName || study.MainDicomTags?.PatientName || "N/A"}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '10px', color: '#64748b', display: 'flex', gap: '6px' }}>
+                                                                        <span>{study.PatientMainDicomTags?.PatientSex || "S/X"}</span>
+                                                                        <span>|</span>
+                                                                        <span>{study.PatientMainDicomTags?.PatientAge || "Edad N/A"}</span>
+                                                                    </div>
+                                                                </td>
                                                                 <td style={{ padding: '12px', fontSize: '11px', color: '#64748b' }}>{study.PatientMainDicomTags?.PatientID || study.MainDicomTags?.PatientID || "N/A"}</td>
                                                                 <td style={{ padding: '12px' }}>{study.MainDicomTags?.StudyDate || "N/A"}</td>
                                                                 <td style={{ padding: '12px', fontSize: '12px' }}>{study.MainDicomTags?.StudyDescription || "N/A"}</td>
@@ -1246,15 +1521,6 @@ function App() {
                                                             <div style={{ display: 'flex', gap: '4px' }}>
                                                                 <button
                                                                     className="btn btn-primary btn-sm"
-                                                                    style={{ backgroundColor: '#059669', color: 'white', fontWeight: 'bold' }}
-                                                                    onClick={() => handlePushToPacs(file.downloadPath)}
-                                                                    disabled={isConverting}
-                                                                    title="Envía una serie de imágenes sincronizada 1:1"
-                                                                >
-                                                                    Hacia PACS (1:1)
-                                                                </button>
-                                                                <button
-                                                                    className="btn btn-primary btn-sm"
                                                                     style={{ backgroundColor: '#7c3aed', color: 'white', fontWeight: 'bold' }}
                                                                     onClick={() => handlePushMedicalObject(file.downloadPath)}
                                                                     disabled={isConverting}
@@ -1263,15 +1529,6 @@ function App() {
                                                                     Hacia PACS (SEG)
                                                                 </button>
                                                             </div>
-                                                        )}
-                                                        
-                                                        {(file.name.endsWith('.nii.gz') || file.name.endsWith('.nii')) && !file.name.includes('_seg') && !file.name.includes('_det') && (
-                                                            <button
-                                                                className="btn btn-secondary btn-sm"
-                                                                onClick={() => handleConvertToDicom(file.downloadPath)}
-                                                            >
-                                                                A DICOM (.zip)
-                                                            </button>
                                                         )}
                                                     </td>
                                                 </tr>

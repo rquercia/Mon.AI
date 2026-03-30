@@ -25,8 +25,19 @@ def resample_mask_to_dicom(mask_itk, dicom_dir):
     resampled_mask = resampler.Execute(mask_itk)
     return resampled_mask
 
+def find_dicom_dir(root_dir):
+    """Recursively find the first directory that contains DICOM files."""
+    for root, _, files in os.walk(root_dir):
+        if any(f.lower().endswith('.dcm') for f in files):
+            return root
+    return root_dir
+
 def create_seg_object(nifti_mask_path, original_dicom_dir, output_file):
     print(f"Generando objeto DICOM SEG real con highdicom desde {nifti_mask_path}...")
+    
+    # 1. Localizar el directorio real de DICOM (podría estar en un subdirectorio si se subió un zip)
+    original_dicom_dir = find_dicom_dir(original_dicom_dir)
+    print(f"Directorio DICOM detectado: {original_dicom_dir}")
     
     # 1. Cargar máscara NIfTI y remuestrear a geometría DICOM original
     mask_itk = sitk.ReadImage(nifti_mask_path)
@@ -49,6 +60,10 @@ def create_seg_object(nifti_mask_path, original_dicom_dir, output_file):
         
     # 2. Cargar DICOMs originales
     orig_files = [os.path.join(original_dicom_dir, f) for f in os.listdir(original_dicom_dir) if f.lower().endswith('.dcm')]
+    if not orig_files:
+        print(f"Error: No se encontraron archivos .dcm en {original_dicom_dir}")
+        return False
+        
     datasets = [pydicom.dcmread(f) for f in orig_files]
     # Importante: para highdicom, ordenarlos correctamente por ImagePositionPatient (normalmente Z)
     datasets.sort(key=lambda x: float(x.ImagePositionPatient[2]))

@@ -9,8 +9,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
-      - ./data/input:/opt/monai/data
-      - ./data/output:/opt/monai/output
+      - ./data:/opt/monai/data
       - ./models:/opt/monai/models
       - ./scripts:/opt/monai/scripts
     deploy:
@@ -21,7 +20,7 @@ services:
               count: all
               capabilities: [ gpu ]
     command: >
-      bash -c "pip install monai-deploy-app-sdk dicom2nifti SimpleITK ollama langchain && 
+      bash -c "pip install monai-deploy-app-sdk dicom2nifti SimpleITK ollama langchain highdicom requests 'numpy<2' && 
                tail -f /dev/null"
     working_dir: /opt/monai
 
@@ -80,22 +79,22 @@ services:
       - ./orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
       - orthanc_data:/var/lib/orthanc/db
 
-  llm:
-    image: ollama/ollama:latest
-    container_name: monai_llm
-    runtime: nvidia
-    ports:
-      - "11434:11434"
-    volumes:
-      - ./data/ollama:/root/.ollama
-      - ./data/output:/output:ro
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+#  llm:
+#    image: ollama/ollama:latest
+#    container_name: monai_llm
+#    runtime: nvidia
+#    ports:
+#      - "11434:11434"
+#    volumes:
+#      - ./data/ollama:/root/.ollama
+#      - ./data/output:/output:ro
+#    deploy:
+#      resources:
+#        reservations:
+#          devices:
+#            - driver: nvidia
+#              count: all
+#              capabilities: [gpu]
 
 volumes:
   pgdata:

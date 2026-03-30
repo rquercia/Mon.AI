@@ -9,7 +9,7 @@ def chat_medgemma(prompt):
     client = ollama.Client(host='http://monai_llm:11434')
     
     # Nombre exacto del modelo que descargamos desde Ollama Library
-    MODEL_NAME = 'MedAIBase/MedGemma1.5:4b'
+    MODEL_NAME = 'dcarrascosa/medgemma-1.5-4b-it:q8_0'
     
     try:
         response = client.chat(model=MODEL_NAME, messages=[

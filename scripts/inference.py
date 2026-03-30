@@ -109,6 +109,11 @@ def run_inference(model_type):
         
         if os.path.exists(config_path) and os.path.exists(weights_path):
             print("Cargando modelo de Detección REAL (RetinaNet)...")
+            # Muy importante: Agregar la ruta del bundle al sys.path para que MONAI encuentre sus scripts internos
+            bundle_root = "/opt/monai/models/lung_nodule_ct_detection"
+            if bundle_root not in sys.path:
+                sys.path.append(bundle_root)
+
             parser = ConfigParser()
             parser.read_config(config_path)
             
@@ -135,9 +140,11 @@ def run_inference(model_type):
 
     # 5. Bucle de Inferencia
     postfix = "det" if model_type == "detection" else "seg"
-    saver_orig = SaveImaged(keys=["image"], output_dir=OUTPUT_DIR, output_postfix="orig", resample=False, separate_folder=False)
+    # Solo mantenemos el saver_pred (la máscara) porque es necesaria para generar el DICOM-SEG (botón violeta)
+    # y el JSON para el reporte IA.
+    # saver_orig = SaveImaged(keys=["image"], output_dir=OUTPUT_DIR, output_postfix="orig", resample=False, separate_folder=False)
     saver_pred = SaveImaged(keys=["pred"], output_dir=OUTPUT_DIR, output_postfix=postfix, resample=False, separate_folder=False, dtype=np.uint8)
-    saver_visual = SaveImaged(keys=["visual"], output_dir=OUTPUT_DIR, output_postfix="overlay", resample=False, separate_folder=False)
+    # saver_visual = SaveImaged(keys=["visual"], output_dir=OUTPUT_DIR, output_postfix="overlay", resample=False, separate_folder=False)
 
     with torch.no_grad():
         with torch.cuda.amp.autocast():
@@ -265,9 +272,9 @@ def run_inference(model_type):
                 
                 # Guardar
                 for d in decollate_batch(batch_data):
-                    saver_orig(d)
+                    # saver_orig(d)
                     saver_pred(d)
-                    saver_visual(d)
+                    # saver_visual(d)
                 print(f"Archivo guardado exitosamente.")
 
     print(f"\n--- Inferencia {model_type.upper()} completada con RTX 3080 ---")
