@@ -38,6 +38,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./backend:/app
       - /app/node_modules
+      - ./:/project_sync
       - ./data:/app/data
     depends_on:
       - db

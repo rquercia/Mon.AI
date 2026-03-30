@@ -76,6 +76,10 @@ function App() {
     const [pacsLoading, setPacsLoading] = useState(false);
     const [selectedSeriesInfo, setSelectedSeriesInfo] = useState(null);
     const [progress, setProgress] = useState(0);
+    const [gitLogs, setGitLogs] = useState('');
+    const [showGitLogModal, setShowGitLogModal] = useState(false);
+    const [isGitLoading, setIsGitLoading] = useState(false);
+    const [githubToken, setGithubToken] = useState(localStorage.getItem('github_token') || '');
 
     const fetchResults = async () => {
         try {
@@ -585,6 +589,37 @@ function App() {
     const [zoomFactor, setZoomFactor] = useState(1.0);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+    const handleGitAction = async (action) => {
+        if (!githubToken && action === 'push') {
+            setMessage({ type: 'error', text: 'Por favor, introduce tu GitHub Token primero.' });
+            return;
+        }
+        localStorage.setItem('github_token', githubToken);
+        console.log(`[GIT_DEBUG] Iniciando acción: ${action}`);
+        setGitLogs(`> [READY] MONITOR DE CONTROL ACTIVADO\n> Procesando comando: ${action}...\n`);
+        setShowGitLogModal(true);
+        setIsGitLoading(true);
+        
+        try {
+            const resp = await fetch(`http://localhost:809/api/git/${action}`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: githubToken })
+            });
+            const data = await resp.json();
+            
+            if (resp.ok) {
+                setGitLogs(prev => prev + `\n> [OK] Operación finalizada.\n\nSALIDA DEL SISTEMA:\n${data.output || 'Sin mensajes.'}`);
+            } else {
+                setGitLogs(prev => prev + `\n> [FAIL] Error en el servidor.\n\nDETALLES:\n${data.details || data.error}`);
+            }
+        } catch (error) {
+            setGitLogs(prev => prev + `\n> [NETWORK_ERROR] No se pudo conectar con el backend.`);
+        } finally {
+            setIsGitLoading(false);
+        }
+    };
 
     const handleGeneratePreview = async () => {
         setIsPreviewLoading(true);
@@ -1367,6 +1402,91 @@ function App() {
                         </div>
                     )}
 
+                    {activeTab === 'config' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="card" style={{ 
+                                background: 'linear-gradient(135deg, #ff8c00 0%, #ff4500 100%)', 
+                                color: 'white',
+                                border: 'none',
+                                padding: '30px',
+                                borderRadius: '24px',
+                                boxShadow: '0 20px 40px rgba(255, 69, 0, 0.3)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                                    <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '10px', borderRadius: '15px' }}>
+                                        <Database size={32} color="white" />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900' }}>¡¡¡ PANEL DE SINCRONIZACIÓN ACTIVO !!!</h2>
+                                        <p style={{ margin: 0, opacity: 0.9, fontSize: '0.9rem' }}>Estado: LISTO PARA TRANSFERENCIA</p>
+                                    </div>
+                                </div>
+
+                                <div style={{ backgroundColor: 'rgba(0,0,0,0.1)', padding: '15px 20px', borderRadius: '16px', marginBottom: '15px', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.7, marginBottom: '4px' }}>Repositorio Remoto</div>
+                                    <div style={{ fontFamily: 'monospace', fontSize: '1.1rem' }}>https://github.com/rquercia/Mon.AI</div>
+                                </div>
+
+                                <div style={{ marginBottom: '25px' }}>
+                                    <label style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.7, display: 'block', marginBottom: '8px' }}>GitHub Personal Access Token (PAT)</label>
+                                    <input 
+                                        type="password" 
+                                        value={githubToken}
+                                        onChange={(e) => setGithubToken(e.target.value)}
+                                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxx"
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            borderRadius: '10px',
+                                            border: '1px solid rgba(255,255,255,0.3)',
+                                            backgroundColor: 'rgba(255,255,255,0.1)',
+                                            color: 'white',
+                                            outline: 'none'
+                                        }}
+                                    />
+                                    <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', marginTop: '6px' }}>* El token se guarda de forma segura en tu navegador local.</p>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '15px' }}>
+                                    <button 
+                                        className="btn" 
+                                        style={{ 
+                                            flex: 1, 
+                                            backgroundColor: '#fff', 
+                                            color: '#ff4500', 
+                                            fontWeight: '900', 
+                                            padding: '20px',
+                                            borderRadius: '12px',
+                                            cursor: 'pointer',
+                                            border: 'none',
+                                            fontSize: '1.1rem'
+                                        }}
+                                        onClick={() => handleGitAction('push')}
+                                    >
+                                        ¡ENVIAR A GITHUB AHORA! (Push)
+                                    </button>
+                                    <button 
+                                        className="btn" 
+                                        style={{ 
+                                            flex: 1, 
+                                            backgroundColor: 'rgba(0,0,0,0.4)', 
+                                            color: 'white', 
+                                            fontWeight: '900', 
+                                            padding: '20px',
+                                            borderRadius: '12px',
+                                            cursor: 'pointer',
+                                            border: '1px solid white',
+                                            fontSize: '1.1rem'
+                                        }}
+                                        onClick={() => handleGitAction('pull')}
+                                    >
+                                        DESCARGAR DE GITHUB (Pull)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'inferencia' && (
                         <div className="card">
                             <h3>Inferencia MONAI 3D GPU</h3>
@@ -1615,6 +1735,57 @@ function App() {
                                                 <p>Generado por Modelo: <strong>{selectedJson.model || 'MONAI Detection'}</strong></p>
                                                 <p>Estudio: {selectedJson.study || 'Detección Estándar'}</p>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* GIT LOG MODAL */}
+                            {showGitLogModal && (
+                                <div className="modal-overlay" style={{ zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => !isGitLoading && setShowGitLogModal(false)}>
+                                    <div className="modal-content" style={{ maxWidth: '700px', width: '90%', backgroundColor: '#020617', border: '1px solid #1e293b', boxShadow: '0 0 50px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
+                                        <div className="modal-header" style={{ backgroundColor: '#0f172a', borderBottom: '1px solid #1e293b', color: '#94a3b8', padding: '15px 25px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div className={`w-2 h-2 rounded-full ${isGitLoading ? 'bg-orange-500 animate-ping' : 'bg-emerald-500'}`}></div>
+                                                <span style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '2px', color: '#38bdf8' }}>TERMINAL DE SINCRONIZACIÓN</span>
+                                            </div>
+                                            {!isGitLoading && <button className="close-btn" style={{ color: '#475569', fontSize: '28px' }} onClick={() => setShowGitLogModal(false)}>&times;</button>}
+                                        </div>
+                                        <div className="modal-body" style={{ padding: '0', backgroundColor: '#000' }}>
+                                            <div style={{ 
+                                                padding: '30px', 
+                                                fontFamily: '"Fira Code", monospace', 
+                                                fontSize: '13px', 
+                                                color: '#f8fafc', 
+                                                minHeight: '250px',
+                                                maxHeight: '500px',
+                                                overflowY: 'auto',
+                                                whiteSpace: 'pre-wrap',
+                                                lineHeight: '1.6'
+                                            }}>
+                                                {gitLogs}
+                                                {isGitLoading && <span style={{ color: '#38bdf8' }} className="animate-pulse">_</span>}
+                                            </div>
+                                            
+                                            {isGitLoading && (
+                                                <div style={{ height: '2px', width: '100%', backgroundColor: '#0f172a', position: 'relative', overflow: 'hidden' }}>
+                                                    <div className="absolute top-0 h-full bg-blue-500" style={{ 
+                                                        width: '40%', 
+                                                        animation: 'shimmer 2s infinite linear' 
+                                                    }}></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="modal-footer" style={{ padding: '15px 25px', backgroundColor: '#0f172a', borderTop: '1px solid #1e293b', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                                            {!isGitLoading && (
+                                                <button 
+                                                    className="btn btn-primary btn-sm" 
+                                                    onClick={() => setShowGitLogModal(false)}
+                                                    style={{ backgroundColor: '#0ea5e9' }}
+                                                >
+                                                    Entendido
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1897,6 +2068,10 @@ function App() {
           color: #64748b;
           display: flex;
           justify-content: space-between;
+        }
+        @keyframes shimmer {
+          0% { left: -100%; }
+          100% { left: 100%; }
         }
       `}</style>
         </DicomProvider>

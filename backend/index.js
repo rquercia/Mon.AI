@@ -785,6 +785,32 @@ app.post('/api/analyze-rx-lmstudio', (req, res) => {
     });
 });
 
+// Endpoints para GIT SYNC
+app.post('/api/git/push', (req, res) => {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token de GitHub requerido' });
+    
+    // Inyectamos el token en la URL de forma segura para este comando
+    const remoteUrl = `https://${token}@github.com/rquercia/Mon.AI.git`;
+    const command = `git config --global --add safe.directory /project_sync && git add . && git commit -m "update: Sync from MonAI CRM" && git push "${remoteUrl}" main --force`;
+    
+    exec(command, { cwd: '/project_sync' }, (error, stdout, stderr) => {
+        if (error) return res.status(500).json({ error: 'Error en Push', details: stderr || error.message });
+        res.json({ status: 'success', output: stdout });
+    });
+});
+
+app.post('/api/git/pull', (req, res) => {
+    const { token } = req.body;
+    const remoteUrl = token ? `https://${token}@github.com/rquercia/Mon.AI.git` : 'https://github.com/rquercia/Mon.AI.git';
+    const command = `git config --global --add safe.directory /project_sync && git pull "${remoteUrl}" main`;
+    
+    exec(command, { cwd: '/project_sync' }, (error, stdout, stderr) => {
+        if (error) return res.status(500).json({ error: 'Error en Pull', details: stderr || error.message });
+        res.json({ status: 'success', output: stdout });
+    });
+});
+
 app.get('/api/pacs/download/:id', async (req, res) => {
   try {
     const authHeader = { 'Authorization': 'Basic ' + Buffer.from('admin:admin').toString('base64') };
