@@ -590,14 +590,11 @@ function App() {
     const [previewUrl, setPreviewUrl] = useState(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
-    const handleGitAction = async (action) => {
-        if (!githubToken && action === 'push') {
-            setMessage({ type: 'error', text: 'Por favor, introduce tu GitHub Token primero.' });
-            return;
-        }
+    const ejecutarSincronizacionGit = async (action) => {
+        window.alert(`!!! ACTIVANDO SINCRONIZACIÓN: ${action} !!!`);
+        console.log(`[GIT_DEBUG_V3] Acción: ${action} | Token: ${githubToken ? 'PRESENTE' : 'VACÍO'}`);
         localStorage.setItem('github_token', githubToken);
-        console.log(`[GIT_DEBUG] Iniciando acción: ${action}`);
-        setGitLogs(`> [READY] MONITOR DE CONTROL ACTIVADO\n> Procesando comando: ${action}...\n`);
+        setGitLogs(`> [V3] MONITOR DE SINCRONIZACIÓN INICIADO\n> Conectando con servidor para: ${action}...\n`);
         setShowGitLogModal(true);
         setIsGitLoading(true);
         
@@ -610,12 +607,12 @@ function App() {
             const data = await resp.json();
             
             if (resp.ok) {
-                setGitLogs(prev => prev + `\n> [OK] Operación finalizada.\n\nSALIDA DEL SISTEMA:\n${data.output || 'Sin mensajes.'}`);
+                setGitLogs(prev => prev + `\n> [ÉXITO] GitHub actualizado correctamente.\n\nSISTEMA:\n${data.output || 'Finalizado.'}`);
             } else {
-                setGitLogs(prev => prev + `\n> [FAIL] Error en el servidor.\n\nDETALLES:\n${data.details || data.error}`);
+                setGitLogs(prev => prev + `\n> [ERROR] El servidor respondió con fallo.\n\nDETALLES:\n${data.details || data.error}`);
             }
         } catch (error) {
-            setGitLogs(prev => prev + `\n> [NETWORK_ERROR] No se pudo conectar con el backend.`);
+            setGitLogs(prev => prev + `\n> [FALLO_TOTAL] No hay conexión con el backend.\nVerifica Docker.`);
         } finally {
             setIsGitLoading(false);
         }
@@ -1414,11 +1411,11 @@ function App() {
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
                                     <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: '10px', borderRadius: '15px' }}>
-                                        <Database size={32} color="white" />
+                                        <Server size={32} color="white" />
                                     </div>
                                     <div>
-                                        <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900' }}>¡¡¡ PANEL DE SINCRONIZACIÓN ACTIVO !!!</h2>
-                                        <p style={{ margin: 0, opacity: 0.9, fontSize: '0.9rem' }}>Estado: LISTO PARA TRANSFERENCIA</p>
+                                        <h2 style={{ margin: 0, fontSize: '2.5rem', fontWeight: '900', color: 'yellow' }}>SISTEMA GIT v3.0</h2>
+                                        <p style={{ margin: 0, opacity: 1, fontSize: '1rem', fontWeight: 'bold' }}>CONTROL DE EMERGENCIA PARA SINCRONIZACIÓN</p>
                                     </div>
                                 </div>
 
@@ -1447,40 +1444,42 @@ function App() {
                                     <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', marginTop: '6px' }}>* El token se guarda de forma segura en tu navegador local.</p>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '15px' }}>
+                                <div style={{ display: 'flex', gap: '20px', marginTop: '30px' }}>
                                     <button 
-                                        className="btn" 
+                                        onClick={() => ejecutarSincronizacionGit('push')}
                                         style={{ 
                                             flex: 1, 
-                                            backgroundColor: '#fff', 
-                                            color: '#ff4500', 
+                                            backgroundColor: '#ff0000', 
+                                            color: '#ffffff', 
                                             fontWeight: '900', 
-                                            padding: '20px',
-                                            borderRadius: '12px',
+                                            padding: '30px',
+                                            borderRadius: '0px',
                                             cursor: 'pointer',
-                                            border: 'none',
-                                            fontSize: '1.1rem'
+                                            border: '5px solid white',
+                                            fontSize: '1.5rem',
+                                            textTransform: 'uppercase',
+                                            boxShadow: '10px 10px 0px rgba(0,0,0,0.5)'
                                         }}
-                                        onClick={() => handleGitAction('push')}
                                     >
-                                        ¡ENVIAR A GITHUB AHORA! (Push)
+                                        ¡PUSHEAR AHORA!
                                     </button>
                                     <button 
-                                        className="btn" 
+                                        onClick={() => ejecutarSincronizacionGit('pull')}
                                         style={{ 
                                             flex: 1, 
-                                            backgroundColor: 'rgba(0,0,0,0.4)', 
-                                            color: 'white', 
+                                            backgroundColor: '#000000', 
+                                            color: '#ffffff', 
                                             fontWeight: '900', 
-                                            padding: '20px',
-                                            borderRadius: '12px',
+                                            padding: '30px',
+                                            borderRadius: '0px',
                                             cursor: 'pointer',
-                                            border: '1px solid white',
-                                            fontSize: '1.1rem'
+                                            border: '5px solid white',
+                                            fontSize: '1.5rem',
+                                            textTransform: 'uppercase',
+                                            boxShadow: '10px 10px 0px rgba(0,0,0,0.5)'
                                         }}
-                                        onClick={() => handleGitAction('pull')}
                                     >
-                                        DESCARGAR DE GITHUB (Pull)
+                                        PULL FORZADO
                                     </button>
                                 </div>
                             </div>
