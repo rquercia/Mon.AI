@@ -702,7 +702,7 @@ app.post('/api/analyze-full-study', (req, res) => {
 
 // Endpoint para PREVIEW (Sin enviar a la IA)
 app.post('/api/preview-mosaico-lmstudio', (req, res) => {
-    const { patientName, patientAge, patientSex, studyDescription, zoomFactor } = req.body;
+    const { patientName, patientAge, patientSex, studyDescription, zoomFactor, winGral, winLung, winBone } = req.body;
     const inputDir = '/app/data/input';
     const outputDir = '/app/data/output';
 
@@ -711,17 +711,25 @@ app.post('/api/preview-mosaico-lmstudio', (req, res) => {
     
     const patientInfo = JSON.stringify({ name: patientName, age: patientAge, sex: patientSex, study: studyDescription });
 
+    const wGral = (winGral && winGral.length === 2) ? `--win-gral ${winGral[0]} ${winGral[1]}` : "";
+    const wLung = (winLung && winLung.length === 2) ? `--win-lung ${winLung[0]} ${winLung[1]}` : "";
+    const wBone = (winBone && winBone.length === 2) ? `--win-bone ${winBone[0]} ${winBone[1]}` : "";
+
     // Comando con flag --preview y --zoom
-    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' --zoom ${zoomFactor || 1.0} --preview`;
+    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' --preview ${wGral} ${wLung} ${wBone}`;
 
     exec(command, (error, stdout, stderr) => {
         try {
             const output = stdout ? stdout.toString() : "";
-            const previewMatch = output.match(/---PREVIEW_IMAGE---:(.*)/);
-            const previewFile = (previewMatch && previewMatch[1]) ? previewMatch[1].trim() : null;
+            const previewMatch = output.match(/---PREVIEW_IMAGES---:(.*)/);
+            const previewFilesRaw = (previewMatch && previewMatch[1]) ? previewMatch[1].trim() : "[]";
+            let previewFiles = [];
+            try {
+                previewFiles = JSON.parse(previewFilesRaw);
+            } catch(e) { console.error("Error parsing preview images:", e); }
             
-            if (!previewFile) return res.status(500).json({ error: 'No se pudo generar la vista previa' });
-            res.json({ previewUrl: `/api/download/${previewFile}` });
+            if (previewFiles.length === 0) return res.status(500).json({ error: 'No se pudo generar la vista previa' });
+            res.json({ previewUrls: previewFiles.map(img => `/api/download/${img}`) });
         } catch (err) {
             res.status(500).json({ error: 'Error en render de preview', details: err.message });
         }
@@ -730,7 +738,7 @@ app.post('/api/preview-mosaico-lmstudio', (req, res) => {
 
 // Endpoint para EXTERNAL INFERENCE (LM STUDIO)
 app.post('/api/analyze-rx-lmstudio', (req, res) => {
-    const { patientName, patientAge, patientSex, studyDescription, zoomFactor, customPrompt } = req.body;
+    const { patientName, patientAge, patientSex, studyDescription, zoomFactor, customPrompt, winGral, winLung, winBone } = req.body;
     
     // Rutas para backend
     const inputDir = '/app/data/input';
@@ -756,10 +764,15 @@ app.post('/api/analyze-rx-lmstudio', (req, res) => {
         study: studyDescription || 'Estudio RX'
     });
 
-    console.log(`[LM_STUDIO] Iniciando análisis para: ${patientName} con Zoom: ${zoomFactor}`);
+    // Formatear parámetros de ventanas si existen
+    const wGral = (winGral && winGral.length === 2) ? `--win-gral ${winGral[0]} ${winGral[1]}` : "";
+    const wLung = (winLung && winLung.length === 2) ? `--win-lung ${winLung[0]} ${winLung[1]}` : "";
+    const wBone = (winBone && winBone.length === 2) ? `--win-bone ${winBone[0]} ${winBone[1]}` : "";
 
-    // 2. Ejecutar script de LM Studio con --zoom
-    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' "${monaiPromptPath}" --zoom ${zoomFactor || 1.5}`;
+    console.log(`[LM_STUDIO] Iniciando análisis para: ${patientName} con Ventanas: ${wGral} ${wLung} ${wBone}`);
+
+    // 2. Ejecutar script de LM Studio con parámetros dinámicos
+    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' "${monaiPromptPath}" ${wGral} ${wLung} ${wBone}`;
 
     exec(command, { maxBuffer: 1024 * 1024 * 80, timeout: 400000 }, (error, stdout, stderr) => {
         try {

@@ -14,45 +14,45 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
-def generate_filters(img):
+def generate_filters(img, win_gral=None, win_lung=None, win_bone=None):
     stats = sitk.StatisticsImageFilter()
     stats.Execute(img)
     min_val, max_val = float(stats.GetMinimum()), float(stats.GetMaximum())
     rango = (max_val - min_val) if (max_val > min_val) else 1.0
+    
+    print(f"[DICOM_STATS] Image Min: {min_val} | Max: {max_val} | Range: {rango}")
+
+    # Intentamos leer la ventana por defecto del DICOM (WindowCenter/Width)
+    d_center, d_width = None, None
+    try:
+        d_center = float(img.GetMetaData('0028|1050').split('\\')[0]) if img.HasMetaDataKey('0028|1050') else None
+        d_width = float(img.GetMetaData('0028|1051').split('\\')[0]) if img.HasMetaDataKey('0028|1051') else None
+    except: pass
 
     def get_array(sitk_img):
         return sitk.GetArrayFromImage(sitk.Cast(sitk_img, sitk.sitkUInt8))
 
-    img_gen = get_array(sitk.RescaleIntensity(img, 0, 255))
-    img_lung = get_array(sitk.RescaleIntensity(sitk.IntensityWindowing(img, min_val, min_val + rango * 0.5), 0, 255))
-    img_bone = get_array(sitk.RescaleIntensity(sitk.IntensityWindowing(img, min_val + rango * 0.3, max_val), 0, 255))
+    # Gral Window: Prioridad 1: User | Prioridad 2: DICOM Meta | Prioridad 3: Full Range
+    if win_gral:
+        g_min, g_max = float(win_gral[0]), float(win_gral[1])
+    elif d_center and d_width:
+        g_min, g_max = d_center - d_width/2, d_center + d_width/2
+    else:
+        g_min, g_max = min_val, max_val
+        
+    img_gen = get_array(sitk.RescaleIntensity(sitk.IntensityWindowing(img, int(g_min), int(g_max)), 0, 255))
+    
+    # Lung Window
+    l_min = float(win_lung[0]) if win_lung else min_val
+    l_max = float(win_lung[1]) if win_lung else (min_val + rango * 0.5)
+    img_lung = get_array(sitk.RescaleIntensity(sitk.IntensityWindowing(img, int(l_min), int(l_max)), 0, 255))
+    
+    # Bone Window
+    b_min = float(win_bone[0]) if win_bone else (min_val + rango * 0.3)
+    b_max = float(win_bone[1]) if win_bone else max_val
+    img_bone = get_array(sitk.RescaleIntensity(sitk.IntensityWindowing(img, int(b_min), int(b_max)), 0, 255))
     
     return img_gen, img_lung, img_bone
-
-def crop_with_zoom(img, zoom_factor=1.0):
-    """Detects content, applies a zoom factor centered on the content."""
-    arr = sitk.GetArrayFromImage(img)
-    active = np.where(arr > (np.max(arr) * 0.05))
-    if active[0].size == 0: return img
-    
-    y_min, y_max = np.min(active[0]), np.max(active[0])
-    x_min, x_max = np.min(active[1]), np.max(active[1])
-    
-    y_center = (y_min + y_max) // 2
-    x_center = (x_min + x_max) // 2
-    y_size = (y_max - y_min)
-    x_size = (x_max - x_min)
-
-    # Apply zoom factor (reduce the size of the window and center it)
-    new_y_size = int(y_size / zoom_factor)
-    new_x_size = int(x_size / zoom_factor)
-    
-    y_min_z = max(0, y_center - new_y_size // 2)
-    y_max_z = min(arr.shape[0], y_center + new_y_size // 2)
-    x_min_z = max(0, x_center - new_x_size // 2)
-    x_max_z = min(arr.shape[1], x_center + new_x_size // 2)
-    
-    return img[x_min_z:x_max_z, y_min_z:y_max_z]
 
 def analyze_lmstudio():
     parser = argparse.ArgumentParser()
@@ -60,8 +60,12 @@ def analyze_lmstudio():
     parser.add_argument("output_dir")
     parser.add_argument("info_json")
     parser.add_argument("prompt_path", nargs='?')
-    parser.add_argument("--zoom", type=float, default=1.0)
     parser.add_argument("--preview", action="store_true")
+    
+    # New Window Params % (Optional)
+    parser.add_argument("--win-gral", nargs=2, type=float, help="Min and Max % for General window")
+    parser.add_argument("--win-lung", nargs=2, type=float, help="Min and Max % for Lung window")
+    parser.add_argument("--win-bone", nargs=2, type=float, help="Min and Max % for Bone window")
 
     args = parser.parse_args()
 
@@ -73,79 +77,97 @@ def analyze_lmstudio():
         dcm_files = sorted([f for f in os.listdir(args.input_dir) if f.lower().endswith('.dcm')])
         if not dcm_files: sys.exit(1)
 
-        rows = []
+        generated_files = []
         timestamp = int(time.time())
 
-        for dcm in dcm_files:
-            img = sitk.ReadImage(os.path.join(args.input_dir, dcm))
-            if img.GetDimension() > 2: img = img[:, :, 0]
+        # Procesamos solo la primera radiografía
+        dcm = dcm_files[0]
+        img_original = sitk.ReadImage(os.path.join(args.input_dir, dcm))
+        if img_original.GetDimension() > 2: img_original = img_original[:, :, 0]
 
-            # ZOOM + CROP
-            img = crop_with_zoom(img, args.zoom)
+        # PROCESO FULL PLATE
+        img_rescaled = img_original
 
-            # High Quality Rescale for Vision
-            target_width = 2048
-            orig_size = img.GetSize()
-            scale = target_width / orig_size[0]
-            img = sitk.Resample(img, [target_width, int(orig_size[1] * scale)], sitk.Transform(), sitk.sitkLinear, img.GetOrigin(), img.GetSpacing(), img.GetDirection(), 0.0, img.GetPixelID())
-
-            img_gen, img_lung, img_bone = generate_filters(img)
-            # Aplicar filtro de nitidez (Unsharp Masking simplificado en numpy si sitk falla)
-            row_arr = np.hstack((img_gen, img_lung, img_bone))
-            rows.append(row_arr)
-
-        mosaico_arr = np.vstack(rows)
-        final_img = Image.fromarray(mosaico_arr)
+        # Generar las 3 versiones por separado con valores opcionales en %
+        img_gen, img_lung, img_bone = generate_filters(img_original, win_gral=args.win_gral, win_lung=args.win_lung, win_bone=args.win_bone)
         
-        # Guardar mosaico
-        prefix = "preview" if args.preview else "final_lm"
-        mosaico_name = f"{prefix}_{timestamp}.jpg"
-        mosaico_path = os.path.join(args.output_dir, mosaico_name)
-        final_img.save(mosaico_path, quality=85)
+        filter_names = ["general", "pulmon", "hueso"]
+        filter_arrays = [img_gen, img_lung, img_bone]
+        
+        encoded_images = []
+        prefix = "preview" if args.preview else "final_ia"
+
+        for name, arr in zip(filter_names, filter_arrays):
+            fname = f"{prefix}_{name}_{timestamp}.jpg"
+            fpath = os.path.join(args.output_dir, fname)
+            
+            # Convertir a PIL para redimensionado seguro sin recortes espaciales
+            pill_img = Image.fromarray(arr)
+            
+            # Redimensionar solo si es mayor a 2048 para agilizar visión IA sin perder la placa
+            if pill_img.width > 2048:
+                w, h = pill_img.size
+                scale = 2048 / w
+                pill_img = pill_img.resize((2048, int(h * scale)), Image.Resampling.LANCZOS)
+                
+            pill_img.save(fpath, quality=90)
+            generated_files.append(fname)
+            
+            if not args.preview:
+                encoded_images.append(encode_image(fpath))
 
         if args.preview:
-            print(f"---PREVIEW_IMAGE---:{mosaico_name}")
+            # Mandamos la lista de imágenes generadas para la preview
+            print(f"---PREVIEW_IMAGES---:{json.dumps(generated_files)}")
             return
 
         # SI NO ES PREVIEW, ENVIAR A LM STUDIO
-        base64_image = encode_image(mosaico_path)
         fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
         
         custom_instructions = ""
         if args.prompt_path and os.path.exists(args.prompt_path):
             with open(args.prompt_path, 'r', encoding='utf-8') as f: custom_instructions = f.read().strip()
 
+        # Prompt optimizado para múltiples imágenes separadas
         system_msg = f"""RESPONDE EXCLUSIVAMENTE EN CASTELLANO.
-        Actúa como un médico radiólogo sénior.Analiza la imagen BASADA EN ZOOM ({args.zoom}x).
+        Actúa como un médico radiólogo sénior. 
+        Te adjunto TRES versiones de la MISMA radiografía del paciente, procesadas con distintos ventaneos para mejorar la visualización:
+        1. Visión General
+        2. Ventana de Pulmón (Blanda)
+        3. Ventana Ósea
         
-        DATOS: Nombre: {p_name} | Edad: {p_age} | Sexo: {p_sex} | Estudio: {p_study} | Fecha: {fecha}
+        DATOS DEL PACIENTE: Nombre: {p_name} | Edad: {p_age} | Sexo: {p_sex} | Estudio: {p_study} | Fecha: {fecha}
         
-        Regla de oro: Hallazgos normales = 'impresionan normal' o 'sin particularidades'.
+        Tu tarea es correlacionar los hallazgos entre las tres imágenes para dar un diagnóstico preciso.
         SOLO DEVUELVE EL INFORME EN MARKDOWN. NO INCLUYAS INTRODUCCIONES.
         
-        Protocolos: (Tórax | Columna | Extremidades | Rodilla/Tobillo | Abdomen) [Selecciona el correcto]
-
-        Instrucción: {custom_instructions}
+        Instrucción específica: {custom_instructions}
         """
+
+        # Construir el contenido del mensaje con las 3 imágenes por separado
+        user_content = [{"type": "text", "text": system_msg}]
+        for b64 in encoded_images:
+            user_content.append({
+                "type": "image_url", 
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
+            })
 
         payload = {
             "model": "Medgemma 1.5 4B Instruct",
             "messages": [
-                {"role": "system", "content": "Olvida análisis anteriores. Sesión nueva clínica."},
-                {"role": "user", "content": [
-                    {"type": "text", "text": system_msg},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                ]}
+                {"role": "system", "content": "Análisis clínico multicanal. Correlaciona las ventanas adjuntas."},
+                {"role": "user", "content": user_content}
             ],
             "temperature": 0.1
         }
 
-        response = requests.post("http://host.docker.internal:1234/v1/chat/completions", json=payload, timeout=400)
+        print(f"[LM_STUDIO] Enviando {len(encoded_images)} imágenes separadas...")
+        response = requests.post("http://host.docker.internal:1234/v1/chat/completions", json=payload, timeout=600)
         if response.status_code == 200:
             print("---RADIOLOGY_REPORT_START---")
             print(response.json()['choices'][0]['message']['content'])
             print("---RADIOLOGY_REPORT_END---")
-            print(f"---IMAGES_GENERATED---:[\"{mosaico_name}\"]")
+            print(f"---IMAGES_GENERATED---:{json.dumps(generated_files)}")
         else:
             print(f"Error API: {response.status_code}")
             sys.exit(1)

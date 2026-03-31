@@ -81,6 +81,13 @@ function App() {
     const [isGitLoading, setIsGitLoading] = useState(false);
     const [githubToken, setGithubToken] = useState(localStorage.getItem('github_token') || '');
 
+    // Vantio PACS States
+    const [vantioStudies, setVantioStudies] = useState([]);
+    const [vantioLoading, setVantioLoading] = useState(false);
+    const [vantioSearch, setVantioSearch] = useState({ patientName: '', date: '' });
+    const [selectedVantioStudy, setSelectedVantioStudy] = useState(null);
+    const [vantioSeries, setVantioSeries] = useState([]);
+
     const fetchResults = async () => {
         try {
             const response = await fetch('http://localhost:809/api/results');
@@ -93,12 +100,48 @@ function App() {
         }
     };
 
-    // Refrescar resultados cuando se cambia a la pestaña de resultados
+    // Refrescar resultados cuando se cambia a la pestaña de resultados o PACS
     React.useEffect(() => {
         if (activeTab === 'resultados') {
             fetchResults();
         }
+        if (activeTab === 'pacs-vantio') {
+            handleSearchVantio();
+        }
     }, [activeTab]);
+
+    const handleSearchVantio = async () => {
+        setVantioLoading(true);
+        try {
+            const dateQuery = vantioSearch.date ? `&date=${vantioSearch.date.replace(/-/g, '')}` : '';
+            const nameQuery = vantioSearch.patientName ? `&patientName=${vantioSearch.patientName}` : '';
+            const response = await fetch(`http://localhost:809/api/pacs/studies?_t=${Date.now()}${dateQuery}${nameQuery}`);
+            if (response.ok) {
+                const data = await response.json();
+                setVantioStudies(data);
+            }
+        } catch (error) {
+            console.error('Error fetching Vantio PACS:', error);
+        } finally {
+            setVantioLoading(false);
+        }
+    };
+
+    const handleSelectVantioStudy = async (study) => {
+        setSelectedVantioStudy(study);
+        setVantioLoading(true);
+        try {
+            const response = await fetch(`http://localhost:809/api/pacs/study-series/${study.ID}`);
+            if (response.ok) {
+                const data = await response.json();
+                setVantioSeries(data);
+            }
+        } catch (error) {
+            console.error("Error loading Vantio series:", error);
+        } finally {
+            setVantioLoading(false);
+        }
+    };
 
     const handleFileUpload = async (event) => {
         const files = event.target.files;
@@ -587,7 +630,10 @@ function App() {
     };
 
     const [zoomFactor, setZoomFactor] = useState(1.0);
-    const [previewUrl, setPreviewUrl] = useState(null);
+    const [winGral, setWinGral] = useState([0, 2000]);
+    const [winLung, setWinLung] = useState([-600, 600]);
+    const [winBone, setWinBone] = useState([400, 3000]);
+    const [previewUrls, setPreviewUrls] = useState([]);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
     const ejecutarSincronizacionGit = async (action) => {
@@ -629,16 +675,19 @@ function App() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    patientName: selectedStudy?.PatientMainDicomTags?.PatientName,
+                    patientName: selectedStudy?.PatientMainDicomTags?.PatientName || selectedStudy?.MainDicomTags?.PatientName || "Paciente",
                     patientAge: selectedStudy?.PatientMainDicomTags?.PatientAge,
                     patientSex: selectedStudy?.PatientMainDicomTags?.PatientSex,
                     studyDescription: selectedStudy?.MainDicomTags?.StudyDescription,
-                    zoomFactor 
+                    zoomFactor,
+                    winGral,
+                    winLung,
+                    winBone
                 })
             });
             if (resp.ok) {
                 const data = await resp.json();
-                setPreviewUrl(`http://localhost:809${data.previewUrl}`);
+                setPreviewUrls(data.previewUrls.map(url => `http://localhost:809${url}`));
             }
         } catch (error) {
             console.error(error);
@@ -673,7 +722,10 @@ function App() {
                     patientSex: selectedStudy?.PatientMainDicomTags?.PatientSex,
                     studyDescription: selectedStudy?.MainDicomTags?.StudyDescription,
                     zoomFactor: zoomFactor,
-                    customPrompt: customSystemPrompt 
+                    customPrompt: customSystemPrompt,
+                    winGral,
+                    winLung,
+                    winBone
                 })
             });
 
@@ -797,6 +849,7 @@ function App() {
                             { id: 'inferencia', icon: Cpu, title: 'Inferencia AI' },
                             { id: 'resultados', icon: FileSearch, title: 'Resultados' },
                             { id: 'radiografia', icon: Stethoscope, title: 'Radiografías (MedGemma)' },
+                            { id: 'pacs-vantio', icon: Server, title: 'PACS Vantio' },
                             { id: 'espinografia', icon: Layers, title: 'Espinografías RX' },
                             { id: 'orthanc', icon: Database, title: 'PACS Orthanc' }
                         ].map((item) => (
@@ -960,6 +1013,236 @@ function App() {
                         </div>
                     )}
 
+                    {activeTab === 'pacs-vantio' && (
+                        <div className="vantio-pacs-container animate-in fade-in duration-500">
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h2 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">PACS Vantio Premium</h2>
+                                    <p className="text-slate-500 mt-1">Explora y gestiona estudios médicos sincronizados con Orthanc</p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={handleSearchVantio}
+                                        className="btn btn-secondary shadow-sm hover:shadow-md transition-all active:scale-95"
+                                        disabled={vantioLoading}
+                                    >
+                                        <Activity size={18} className={vantioLoading ? 'animate-spin' : ''} />
+                                        Actualizar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Filtros Modernos */}
+                            <div className="card border-none shadow-xl bg-white/70 backdrop-blur-xl mb-8 p-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Paciente</label>
+                                        <div className="relative group">
+                                            <FileSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Nombre o ID..."
+                                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
+                                                value={vantioSearch.patientName}
+                                                onChange={(e) => setVantioSearch({...vantioSearch, patientName: e.target.value})}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Fecha de Estudio</label>
+                                        <input 
+                                            type="date" 
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
+                                            value={vantioSearch.date}
+                                            onChange={(e) => setVantioSearch({...vantioSearch, date: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button 
+                                            onClick={handleSearchVantio}
+                                            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all active:scale-95"
+                                        >
+                                            Buscar Estudios
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                {/* Listado de Estudios */}
+                                <div className={selectedVantioStudy ? 'lg:col-span-12 xl:col-span-7' : 'lg:col-span-12'}>
+                                    <div className="card border-none shadow-xl overflow-hidden bg-white/80 p-0">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-separate border-spacing-0">
+                                                <thead>
+                                                    <tr className="bg-slate-50/50">
+                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100 first:rounded-tl-2xl">Paciente / ID</th>
+                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100">Fecha</th>
+                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100">Descripción / Modalidad</th>
+                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100 last:rounded-tr-2xl">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {vantioStudies.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan="4" className="px-6 py-12 text-center text-slate-400 italic">
+                                                                {vantioLoading ? 'Cargando estudios...' : 'No se encontraron estudios coincidentes.'}
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        vantioStudies.map((study) => (
+                                                            <tr 
+                                                                key={study.ID} 
+                                                                onClick={() => handleSelectVantioStudy(study)}
+                                                                className={`group cursor-pointer transition-all hover:bg-blue-50/50 ${selectedVantioStudy?.ID === study.ID ? 'bg-blue-50 ring-1 ring-inset ring-blue-500/20' : ''}`}
+                                                            >
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                                                            {study.PatientMainDicomTags?.PatientName?.charAt(0) || 'P'}
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="block font-bold text-slate-900 leading-tight">{study.PatientMainDicomTags?.PatientName || 'N/A'}</span>
+                                                                            <span className="block text-xs text-slate-400 font-mono mt-0.5">{study.PatientMainDicomTags?.PatientID || 'S/ID'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <span className="text-sm font-medium text-slate-600">
+                                                                        {study.MainDicomTags?.StudyDate ? 
+                                                                            `${study.MainDicomTags.StudyDate.slice(6,8)}/${study.MainDicomTags.StudyDate.slice(4,6)}/${study.MainDicomTags.StudyDate.slice(0,4)}` 
+                                                                            : 'N/A'
+                                                                        }
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <span className="text-sm font-semibold text-slate-700 truncate max-w-[200px]">{study.MainDicomTags?.StudyDescription || 'Estudio sin descripción'}</span>
+                                                                        <div className="flex gap-1">
+                                                                            {(study.ModalitiesInStudy || "").split('/').map(m => (
+                                                                                m && <span key={m} className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${m === 'CT' ? 'bg-orange-100 text-orange-600' : m === 'DX' || m === 'CR' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{m}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 text-right">
+                                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button className="p-2 rounded-lg bg-white border border-slate-100 shadow-sm text-blue-600 hover:bg-blue-600 hover:text-white transition-all">
+                                                                            <Activity size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Detalle del Estudio Seleccionado */}
+                                {selectedVantioStudy && (
+                                    <div className="lg:col-span-12 xl:col-span-5 animate-in slide-in-from-right duration-300">
+                                        <div className="card border-none shadow-2xl bg-slate-900 text-white p-0 overflow-hidden h-full sticky top-8">
+                                            <div className="p-6 border-b border-white/10 bg-gradient-to-br from-slate-800 to-slate-900">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-500/30">Detalle de Estudio</span>
+                                                    <button onClick={() => setSelectedVantioStudy(null)} className="text-slate-500 hover:text-white transition-colors">&times;</button>
+                                                </div>
+                                                <h3 className="text-xl font-bold text-white mb-1">{selectedVantioStudy.PatientMainDicomTags?.PatientName}</h3>
+                                                <div className="flex items-center gap-4 text-slate-400 text-sm">
+                                                    <span className="flex items-center gap-1"><Database size={14} /> {selectedVantioStudy.MainDicomTags?.StudyID || 'S/N'}</span>
+                                                    <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                                                    <span>{selectedVantioStudy.Series?.length || 0} Series detectadas</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-6 space-y-6">
+                                                {vantioLoading ? (
+                                                    <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-4">
+                                                        <Activity className="animate-spin text-blue-500" size={32} />
+                                                        <p className="text-sm font-medium">Sincronizando series de Orthanc...</p>
+                                                    </div>
+                                                ) : vantioSeries.length > 0 ? (
+                                                    <div className="space-y-4">
+                                                        {vantioSeries.map((series) => (
+                                                            <div key={series.ID} className="group/item bg-slate-800/50 border border-white/5 rounded-2xl p-4 hover:bg-slate-800 hover:border-blue-500/30 transition-all">
+                                                                <div className="flex justify-between items-center mb-3">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold group-hover/item:bg-blue-500 group-hover/item:text-white transition-all">
+                                                                            {series.MainDicomTags?.SeriesNumber || '#'}
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="block text-sm font-bold text-white leading-tight">{series.MainDicomTags?.SeriesDescription || 'Serie sin nombre'}</span>
+                                                                            <span className="block text-[10px] text-slate-500 font-mono">{series.Instances?.length || 0} imágenes</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${series.MainDicomTags?.Modality === 'CT' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                                                        {series.MainDicomTags?.Modality}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/5">
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            // Logic based on modality
+                                                                            if (series.MainDicomTags?.Modality === 'CT') {
+                                                                                handleImportSeries(series);
+                                                                                setActiveTab('dicom');
+                                                                            } else if (['DX', 'CR'].includes(series.MainDicomTags?.Modality)) {
+                                                                                handleSelectStudy(selectedVantioStudy);
+                                                                                setActiveTab('radiografia');
+                                                                            }
+                                                                        }}
+                                                                        className="flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 hover:bg-blue-600 transition-all text-xs font-bold"
+                                                                    >
+                                                                        <UploadCloud size={14} /> Importar
+                                                                    </button>
+                                                                    <button 
+                                                                        className="flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 hover:bg-indigo-600 transition-all text-xs font-bold"
+                                                                        onClick={() => {
+                                                                            handleSelectStudy(selectedVantioStudy);
+                                                                            if (['DX', 'CR'].includes(series.MainDicomTags?.Modality)) {
+                                                                                setActiveTab('radiografia');
+                                                                            } else {
+                                                                                setActiveTab('resultados');
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <Cpu size={14} /> Analizar IA
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center py-8 text-slate-500">
+                                                        No se encontraron series para este estudio.
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="mt-auto p-6 bg-slate-950/50">
+                                                <button 
+                                                    className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-xs uppercase tracking-[3px] shadow-2xl shadow-blue-500/20 transition-all active:scale-95"
+                                                    onClick={() => {
+                                                        // Example global action
+                                                        handleSelectStudy(selectedVantioStudy);
+                                                        setActiveTab('radiografia');
+                                                    }}
+                                                >
+                                                    Procesar Estudio Completo
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'radiografia' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div className="card h-fit">
@@ -1065,53 +1348,87 @@ function App() {
                                                     {pacsInstances.length} RX
                                                 </span>
                                             </div>
-
-                                            {/* BARRA DE ZOOM Y PREVIEW */}
-                                            <div className="bg-gray-50 border-t border-gray-100 p-4 space-y-4">
-                                                <div className="flex flex-col gap-2">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
-                                                            <Layers size={12} /> Control de Zoom (Tríptico)
-                                                        </span>
-                                                        <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                                                            {zoomFactor.toFixed(1)}x
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <input 
-                                                            type="range" 
-                                                            min="0.1" 
-                                                            max="2.0" 
-                                                            step="0.05" 
-                                                            value={zoomFactor}
-                                                            onChange={(e) => setZoomFactor(parseFloat(e.target.value))}
-                                                            className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                                        />
-                                                        <button 
-                                                            className="text-[10px] bg-white border border-gray-200 px-3 py-1 rounded-md font-bold text-gray-600 hover:bg-gray-50 flex items-center gap-1"
-                                                            onClick={handleGeneratePreview}
-                                                            disabled={isPreviewLoading}
-                                                        >
-                                                            {isPreviewLoading ? 'GENERANDO...' : 'VER TRÍPTICO'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {previewUrl && (
-                                                    <div className="relative group rounded-xl overflow-hidden border-2 border-emerald-100 shadow-inner bg-white">
-                                                        <img 
-                                                            src={previewUrl} 
-                                                            alt="Preview Tríptico" 
-                                                            className="w-full h-auto object-contain max-h-[250px] transition-transform duration-500 group-hover:scale-110"
-                                                        />
-                                                        <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                                                            <span className="text-[9px] text-white font-bold tracking-widest uppercase">Vista Previa del Análisis</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
                                         </div>
                                         
+                                        {/* PREVIEW SIN ZOOM */}
+                                        <div className="bg-gray-50 border-t border-gray-100 p-4 rounded-xl mb-4">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                                                    <Activity size={12} /> Análisis de Ventanas (Ventanéo)
+                                                </span>
+                                                <button 
+                                                    className="text-[10px] bg-emerald-600 border border-emerald-500 px-4 py-1.5 rounded-md font-bold text-white hover:bg-emerald-700 flex items-center gap-1 shadow-sm transition-all"
+                                                    onClick={handleGeneratePreview}
+                                                    disabled={isPreviewLoading}
+                                                >
+                                                    {isPreviewLoading ? 'GENERANDO...' : 'REVISAR VENTANAS (PREVIEW)'}
+                                                </button>
+                                            </div>
+
+                                            {previewUrls.length > 0 && (
+                                                <div className="space-y-4 mt-6 pt-4 border-t border-gray-200">
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {previewUrls.map((url, idx) => (
+                                                            <div key={idx} className="relative group rounded-lg overflow-hidden border border-emerald-100 shadow-sm bg-black">
+                                                                <img 
+                                                                    src={url} 
+                                                                    alt={`Preview Windows ${idx}`} 
+                                                                    className="w-full h-auto object-contain max-h-[250px] transition-all hover:scale-105"
+                                                                    loading="lazy"
+                                                                />
+                                                                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[7px] font-bold py-1 text-center uppercase tracking-widest">
+                                                                    {idx === 0 ? 'General' : idx === 1 ? 'Pulmón' : 'Hueso'}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* CONTROLES DE VENTANA (HU) */}
+                                                    <div className="grid grid-cols-3 gap-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                                                        {[
+                                                            { label: 'Visión Gral (HU)', state: winGral, set: setWinGral, def: [0, 2000] },
+                                                            { label: 'Ventana Pulmón (HU)', state: winLung, set: setWinLung, def: [-600, 600] },
+                                                            { label: 'Ventana Hueso (HU)', state: winBone, set: setWinBone, def: [400, 3000] }
+                                                        ].map((cfg, i) => (
+                                                            <div key={i} className="flex flex-col gap-2">
+                                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{cfg.label}</span>
+                                                                <div className="space-y-1">
+                                                                    <div className="flex justify-between text-[8px] font-mono text-emerald-600">
+                                                                        <div className="flex flex-col">
+                                                                            <span>Low:</span>
+                                                                            <input 
+                                                                                type="number" value={cfg.state[0]} 
+                                                                                className="w-12 bg-gray-50 border-none p-0 text-[10px] focus:ring-0"
+                                                                                onChange={(e) => cfg.set([parseInt(e.target.value) || 0, cfg.state[1]])}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="flex flex-col items-end">
+                                                                            <span>High:</span>
+                                                                            <input 
+                                                                                type="number" value={cfg.state[1]} 
+                                                                                className="w-12 bg-gray-50 border-none p-0 text-[10px] text-right focus:ring-0"
+                                                                                onChange={(e) => cfg.set([cfg.state[0], parseInt(e.target.value) || 0])}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="range" min="-1000" max="4000" step="50" value={cfg.state[0]} 
+                                                                        onChange={(e) => cfg.set([parseInt(e.target.value), cfg.state[1]])}
+                                                                        className="w-full h-1 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+                                                                    />
+                                                                    <input 
+                                                                        type="range" min="-1000" max="4000" step="50" value={cfg.state[1]} 
+                                                                        onChange={(e) => cfg.set([cfg.state[0], parseInt(e.target.value)])}
+                                                                        className="w-full h-1 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                             {pacsInstances.map((instId, index) => (
                                                 <div key={instId} className="bg-white p-2 rounded-lg border border-blue-100 shadow-sm flex flex-col group hover:ring-2 hover:ring-blue-400 transition-all">
@@ -2088,6 +2405,24 @@ function App() {
         @keyframes shimmer {
           0% { left: -100%; }
           100% { left: 100%; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideInRight {
+          from { transform: translateX(20px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        .animate-in {
+          animation-duration: 400ms;
+          animation-fill-mode: both;
+        }
+        .fade-in {
+          animation-name: fadeIn;
+        }
+        .slide-in-from-right {
+          animation-name: slideInRight;
         }
       `}</style>
         </DicomProvider>
