@@ -19,7 +19,8 @@ import {
     User,
     FileText,
     ChevronUp,
-    ChevronDown
+    ChevronDown,
+    Copy
 } from 'lucide-react';
 import { DicomProvider } from './context/DicomContext';
 import EspinografiaSidebar from './components/EspinografiaSidebar';
@@ -106,7 +107,7 @@ function App() {
 
     const fetchResults = async () => {
         try {
-            const response = await fetch('http://localhost:809/api/results');
+            const response = await fetch(`http://${window.location.hostname}:809/api/results`);
             if (response.ok) {
                 const data = await response.json();
                 setResults(data.files || []);
@@ -140,7 +141,7 @@ function App() {
                 accessionNumber: vantioSearch.accessionNumber
             });
 
-            const response = await fetch(`http://localhost:809/api/pacs/studies?${params.toString()}`);
+            const response = await fetch(`http://${window.location.hostname}:809/api/pacs/studies?${params.toString()}`);
             if (response.ok) {
                 const data = await response.json();
                 setVantioStudies(data);
@@ -153,10 +154,15 @@ function App() {
     };
 
     const handleSelectVantioStudy = async (study) => {
+        if (selectedVantioStudy?.ID === study.ID) {
+            setSelectedVantioStudy(null);
+            setVantioSeries([]);
+            return;
+        }
         setSelectedVantioStudy(study);
         setVantioLoading(true);
         try {
-            const response = await fetch(`http://localhost:809/api/pacs/study-series/${study.ID}`);
+            const response = await fetch(`http://${window.location.hostname}:809/api/pacs/study-series/${study.ID}`);
             if (response.ok) {
                 const data = await response.json();
                 setVantioSeries(data);
@@ -181,7 +187,7 @@ function App() {
         }
 
         try {
-            const response = await fetch('http://localhost:809/api/upload-dicom', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/upload-dicom`, {
                 method: 'POST',
                 body: formData,
             });
@@ -224,7 +230,7 @@ function App() {
 
         try {
             const fileName = `session_${Date.now()}.nii.gz`;
-            const response = await fetch('http://localhost:809/api/convert-dicom', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/convert-dicom`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -255,7 +261,7 @@ function App() {
         const timer = startProgressTimer(98, 25000); 
 
         try {
-            const response = await fetch('http://localhost:809/api/run-inference', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/run-inference`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ modelType }),
@@ -282,7 +288,7 @@ function App() {
         try {
             const outputZipName = fileDownloadPath.replace('.nii.gz', '.zip').replace('.nii', '.zip');
 
-            const response = await fetch('http://localhost:809/api/convert-to-dicom', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/convert-to-dicom`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -306,7 +312,7 @@ function App() {
     const handleViewJson = async (fileDownloadPath) => {
         setAiReportText(''); // Reset AI report when opening new JSON
         try {
-            const response = await fetch(`http://localhost:809/api/download/${fileDownloadPath}`);
+            const response = await fetch(`http://${window.location.hostname}:809/api/download/${fileDownloadPath}`);
             if (response.ok) {
                 const data = await response.json();
                 setSelectedJson({ fileName: fileDownloadPath, ...data });
@@ -320,7 +326,7 @@ function App() {
         setIsGeneratingReport(true);
         setAiReportText('Generando reporte con MedGemma estructurado, por favor espera...');
         try {
-            const response = await fetch('http://localhost:809/api/generate-ai-report', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/generate-ai-report`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ jsonFile: fileName }),
@@ -344,7 +350,7 @@ function App() {
         setShowFrameModal(true);
         setIsGeneratingReport(true);
         try {
-            const response = await fetch('http://localhost:809/api/generate-ai-report', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/generate-ai-report`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ jsonFile: fileName }),
@@ -392,7 +398,7 @@ function App() {
         if (!window.confirm('¿Estás seguro de que quieres borrar todos los procesamientos generados?')) return;
 
         try {
-            const response = await fetch('http://localhost:809/api/delete-all', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/delete-all`, {
                 method: 'POST',
             });
             if (response.ok) {
@@ -410,7 +416,7 @@ function App() {
         try {
             const dateQuery = pacsSearchDate ? `&date=${pacsSearchDate}` : '';
             const nameQuery = pacsSearchPatient ? `&patientName=${pacsSearchPatient}` : '';
-            const response = await fetch(`http://localhost:809/api/pacs/studies?_t=${Date.now()}${dateQuery}${nameQuery}`);
+            const response = await fetch(`http://${window.location.hostname}:809/api/pacs/studies?_t=${Date.now()}${dateQuery}${nameQuery}`);
             if (response.ok) {
                 const data = await response.json();
                 // Don't filter, just show all to debug and let user choose
@@ -432,7 +438,7 @@ function App() {
         try {
             const dateQuery = pacsSearchDate ? `&date=${pacsSearchDate}` : '';
             const nameQuery = pacsSearchPatient ? `&patientName=${pacsSearchPatient}` : '';
-            const response = await fetch(`http://localhost:809/api/pacs/studies-rx?_t=${Date.now()}${dateQuery}${nameQuery}`);
+            const response = await fetch(`http://${window.location.hostname}:809/api/pacs/studies-rx?_t=${Date.now()}${dateQuery}${nameQuery}`);
             if (response.ok) {
                 const data = await response.json();
                 setPacsStudies(data);
@@ -453,7 +459,7 @@ function App() {
         
         try {
             console.log("[GUI_DEBUG] 2. Llamando importación para:", series.ID);
-            const importResp = await fetch(`http://localhost:809/api/pacs/import-series/${series.ID}`, { method: 'POST' });
+            const importResp = await fetch(`http://${window.location.hostname}:809/api/pacs/import-series/${series.ID}`, { method: 'POST' });
 
             if (!importResp.ok) {
                 const errData = await importResp.json();
@@ -464,7 +470,7 @@ function App() {
             console.log("[GUI_DEBUG] 3. Importación exitosa. Llamando a IA...");
 
             // 2. Analizar RX con MedGemma
-            const analyzeResp = await fetch('http://localhost:809/api/analyze-rx', {
+            const analyzeResp = await fetch(`http://${window.location.hostname}:809/api/analyze-rx`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -504,7 +510,7 @@ function App() {
         setAiWorkflowStatus('clearing');
         if (showMsg) setMessage({ type: 'neutral', text: 'Liberando memoria GPU (Ollama)...' });
         try {
-            const resp = await fetch('http://localhost:809/api/ai-clear', { method: 'POST' });
+            const resp = await fetch(`http://${window.location.hostname}:809/api/ai-clear`, { method: 'POST' });
             if (resp.ok) {
                 if (showMsg) setMessage({ type: 'success', text: 'Memoria IA liberada.' });
                 setAiWorkflowStatus('idle');
@@ -526,7 +532,7 @@ function App() {
         setMessage({ type: 'neutral', text: 'Paso 1: Cargando MedGemma 1.5 en VRAM...' });
         
         try {
-            const resp = await fetch('http://localhost:809/api/ai-load', {
+            const resp = await fetch(`http://${window.location.hostname}:809/api/ai-load`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model: 'dcarrascosa/medgemma-1.5-4b-it:q8_0' })
@@ -547,8 +553,8 @@ function App() {
         try {
             // Buscamos tanto las series (para identificar proyecciones) como las instancias (imágenes reales)
             const [seriesResp, instancesResp] = await Promise.all([
-                fetch(`http://localhost:809/api/pacs/study-series/${study.ID}`),
-                fetch(`http://localhost:809/api/pacs/study-instances/${study.ID}`)
+                fetch(`http://${window.location.hostname}:809/api/pacs/study-series/${study.ID}`),
+                fetch(`http://${window.location.hostname}:809/api/pacs/study-instances/${study.ID}`)
             ]);
             
             if (seriesResp.ok && instancesResp.ok) {
@@ -576,13 +582,13 @@ function App() {
         
         try {
             // 1. Importar la instancia única
-            const importResp = await fetch(`http://localhost:809/api/pacs/import-instance/${instanceId}`, { method: 'POST' });
+            const importResp = await fetch(`http://${window.location.hostname}:809/api/pacs/import-instance/${instanceId}`, { method: 'POST' });
             if (!importResp.ok) throw new Error("Fallo al importar imagen.");
 
             setMessage({ type: 'neutral', text: 'Analizando con MedGemma... espera unos segundos.' });
             
             // 2. Analizar con el endpoint existente
-            const analyzeResp = await fetch('http://localhost:809/api/analyze-rx', {
+            const analyzeResp = await fetch(`http://${window.location.hostname}:809/api/analyze-rx`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -620,13 +626,13 @@ function App() {
         try {
             // 1. Importar TODAS las imágenes del estudio primero
             // Reutilizamos el endpoint de importar serie del estudio completo
-            const importResp = await fetch(`http://localhost:809/api/pacs/import-series/${pacsSeries[0].ID}`, { method: 'POST' });
+            const importResp = await fetch(`http://${window.location.hostname}:809/api/pacs/import-series/${pacsSeries[0].ID}`, { method: 'POST' });
             if (!importResp.ok) throw new Error("Fallo al importar el set completo de imágenes.");
 
             setMessage({ type: 'neutral', text: 'Generando Mosaico Clínico y analizando... esto tardará un poco más.' });
             
             // 2. Analizar Estudio Completo con MedGemma
-            const analyzeResp = await fetch('http://localhost:809/api/analyze-full-study', {
+            const analyzeResp = await fetch(`http://${window.location.hostname}:809/api/analyze-full-study`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -669,7 +675,7 @@ function App() {
         setIsGitLoading(true);
         
         try {
-            const resp = await fetch(`http://localhost:809/api/git/${action}`, { 
+            const resp = await fetch(`http://${window.location.hostname}:809/api/git/${action}`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: githubToken })
@@ -693,10 +699,10 @@ function App() {
         try {
             // Importar primero si no hay nada
             if (pacsInstances.length > 0) {
-                await fetch(`http://localhost:809/api/pacs/import-series/${pacsSeries[0].ID}`, { method: 'POST' });
+                await fetch(`http://${window.location.hostname}:809/api/pacs/import-series/${pacsSeries[0].ID}`, { method: 'POST' });
             }
 
-            const resp = await fetch('http://localhost:809/api/preview-mosaico-lmstudio', {
+            const resp = await fetch(`http://${window.location.hostname}:809/api/preview-mosaico-lmstudio`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -712,7 +718,7 @@ function App() {
             });
             if (resp.ok) {
                 const data = await resp.json();
-                setPreviewUrls(data.previewUrls.map(url => `http://localhost:809${url}`));
+                setPreviewUrls(data.previewUrls.map(url => `http://${window.location.hostname}:809${url}`));
             }
         } catch (error) {
             console.error(error);
@@ -729,16 +735,16 @@ function App() {
         
         try {
             // 1. Importar la(s) imagen(es)
-            let importUrl = `http://localhost:809/api/pacs/import-series/${pacsSeries[0].ID}`;
+            let importUrl = `http://${window.location.hostname}:809/api/pacs/import-series/${pacsSeries[0].ID}`;
             if (instanceId) {
-                importUrl = `http://localhost:809/api/pacs/import-instance/${instanceId}`;
+                importUrl = `http://${window.location.hostname}:809/api/pacs/import-instance/${instanceId}`;
             }
             const importResp = await fetch(importUrl, { method: 'POST' });
             if (!importResp.ok) throw new Error("Fallo al importar imágenes.");
 
             setMessage({ type: 'neutral', text: 'Análisis en curso en LM Studio...' });
             
-            const analyzeResp = await fetch('http://localhost:809/api/analyze-rx-lmstudio', {
+            const analyzeResp = await fetch(`http://${window.location.hostname}:809/api/analyze-rx-lmstudio`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -776,7 +782,7 @@ function App() {
         setPacsLoading(true);
         setMessage({ type: 'neutral', text: `Importando serie ${series.MainDicomTags.SeriesNumber} desde PACS...` });
         try {
-            const response = await fetch(`http://localhost:809/api/pacs/import-series/${series.ID}`, {
+            const response = await fetch(`http://${window.location.hostname}:809/api/pacs/import-series/${series.ID}`, {
                 method: 'POST'
             });
             if (response.ok) {
@@ -807,7 +813,7 @@ function App() {
         setMessage({ type: 'neutral', text: 'Sincronizando y enviando inferencia al PACS Orthanc...' });
         const timer = startProgressTimer(95, 12000);
         try {
-            const response = await fetch('http://localhost:809/api/pacs/push-inference', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/pacs/push-inference`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filePath })
@@ -834,7 +840,7 @@ function App() {
         setMessage({ type: 'neutral', text: 'Generando y enviando objeto médico DICOM-SEG...' });
         const timer = startProgressTimer(95, 5000);
         try {
-            const response = await fetch('http://localhost:809/api/pacs/push-medical-object', {
+            const response = await fetch(`http://${window.location.hostname}:809/api/pacs/push-medical-object`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filePath })
@@ -911,7 +917,7 @@ function App() {
                 {activeTab === 'orthanc' ? (
                     <div className="flex-1 bg-white h-screen">
                         <iframe 
-                            src="http://localhost:8282/ui/app/" 
+                            src={`http://${window.location.hostname}:8282/ui/app/`} 
                             style={{ width: '100%', height: '100%', border: 'none' }}
                             title="Orthanc Explorer 2"
                         />
@@ -942,14 +948,7 @@ function App() {
                                 }}></div>
                             </div>
                         )}
-                        <header className="content-header">
-
-                    <h1>{activeTab === 'radiografia' ? 'Análisis de Radiografía (MedGemma)' : activeTab === 'dicom' ? 'Gestión de Estudios DICOM' : 'Panel de Control'}</h1>
-                    <div className="tabs-container">
-                        <button className="tab-btn active">Vista General</button>
-                        <button className="tab-btn">Historial</button>
-                    </div>
-                </header>
+                        {/* Header y navegación general eliminados */}
 
                 <section className="content-body">
                     {activeTab === 'dicom' && (
@@ -1011,7 +1010,7 @@ function App() {
 
                                     {lastConvertedFile && (
                                         <a
-                                            href={`http://localhost:809/api/download-input/${lastConvertedFile}`}
+                                            href={`http://${window.location.hostname}:809/api/download-input/${lastConvertedFile}`}
                                             download
                                             className="btn btn-secondary"
                                             style={{ backgroundColor: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', textDecoration: 'none' }}
@@ -1061,13 +1060,12 @@ function App() {
                                             {/* Encabezados Principales */}
                                             <tr className="bg-slate-50 text-slate-500 text-[11px] font-black uppercase tracking-wider border-b border-slate-200">
                                                 <th className="px-3 py-3 w-10 text-center"></th>
-                                                <th className="px-3 py-3">Fecha nacimiento</th>
                                                 <th className="px-3 py-3">Nombre del paciente</th>
                                                 <th className="px-3 py-3">ID del paciente</th>
-                                                <th className="px-3 py-3">Descripción del estudio</th>
                                                 <th className="px-3 py-3">Fecha estudio</th>
+                                                <th className="px-3 py-3">Descripción</th>
                                                 <th className="px-3 py-3">Modalidad</th>
-                                                <th className="px-3 py-3 text-center"># Ser/Inst</th>
+                                                <th className="px-3 py-3 text-center">Series/Imag.</th>
                                                 <th className="px-3 py-3"></th>
                                             </tr>
                                             {/* Fila de Filtros */}
@@ -1075,11 +1073,10 @@ function App() {
                                                 <th className="p-2 border-r border-slate-200/50">
                                                     <button onClick={() => { setVantioSearch({patientName:'', patientId:'', patientBirthDate:'', studyDate:'', studyDescription:'', modality:'', accessionNumber:''}); setTimeout(handleSearchVantio, 0); }} className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">&times;</button>
                                                 </th>
-                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientBirthDate} onChange={(e) => setVantioSearch({...vantioSearch, patientBirthDate: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
-                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientName} onChange={(e) => setVantioSearch({...vantioSearch, patientName: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
-                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientId} onChange={(e) => setVantioSearch({...vantioSearch, patientId: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
-                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.studyDescription} onChange={(e) => setVantioSearch({...vantioSearch, studyDescription: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
-                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.studyDate} onChange={(e) => setVantioSearch({...vantioSearch, studyDate: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" placeholder="Nombre..." className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientName} onChange={(e) => setVantioSearch({...vantioSearch, patientName: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" placeholder="ID..." className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientId} onChange={(e) => setVantioSearch({...vantioSearch, patientId: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" placeholder="Fecha..." className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.studyDate} onChange={(e) => setVantioSearch({...vantioSearch, studyDate: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" placeholder="Descr..." className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.studyDescription} onChange={(e) => setVantioSearch({...vantioSearch, studyDescription: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
                                                 <th className="p-2 border-r border-slate-200/50">
                                                     <select className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.modality} onChange={(e) => { setVantioSearch({...vantioSearch, modality: e.target.value}); setTimeout(handleSearchVantio, 0); }}>
                                                         <option value="">Todas</option><option value="CT">CT</option><option value="DX">DX</option><option value="MR">MR</option>
@@ -1092,7 +1089,7 @@ function App() {
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {vantioStudies.length === 0 ? (
-                                                <tr><td colSpan="9" className="px-6 py-20 text-center text-slate-400 italic">Buscando estudios...</td></tr>
+                                                <tr><td colSpan="8" className="px-6 py-20 text-center text-slate-400 italic">Buscando estudios...</td></tr>
                                             ) : (
                                                 vantioStudies.map((study) => (
                                                     <React.Fragment key={study.ID}>
@@ -1104,11 +1101,10 @@ function App() {
                                                             <td className="px-2 py-3 text-center">
                                                                 <input type="checkbox" className="rounded" checked={selectedVantioStudy?.ID === study.ID} readOnly />
                                                             </td>
-                                                            <td className="px-3 py-3 font-mono text-xs text-slate-500">{study.PatientMainDicomTags?.PatientBirthDate || 'N/A'}</td>
                                                             <td className="px-3 py-3 font-bold text-slate-900">{study.PatientMainDicomTags?.PatientName || 'Unknown'}</td>
                                                             <td className="px-3 py-3 font-mono text-xs text-blue-600">{study.PatientMainDicomTags?.PatientID || 'S/ID'}</td>
-                                                            <td className="px-3 py-3 text-slate-600 truncate max-w-[150px]">{study.MainDicomTags?.StudyDescription || '--'}</td>
                                                             <td className="px-3 py-3 text-slate-600 text-[11px] font-bold">{study.MainDicomTags?.StudyDate || 'N/A'}</td>
+                                                            <td className="px-3 py-3 text-slate-600 truncate max-w-[150px]">{study.MainDicomTags?.StudyDescription || '--'}</td>
                                                             <td className="px-3 py-3">
                                                                 <span className="bg-blue-100/50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-black">{study.ModalitiesInStudy || "UN"}</span>
                                                             </td>
@@ -1121,64 +1117,87 @@ function App() {
                                                         {/* FRAME DE DETALLE (INYECTADO ABAJO) */}
                                                         {selectedVantioStudy?.ID === study.ID && (
                                                             <tr className="bg-[#E9E9E9] animate-in slide-in-from-top duration-500">
-                                                                <td colSpan="9" className="p-0 border-y border-slate-300">
+                                                                <td colSpan="8" className="p-0 border-y border-slate-300">
                                                                     <div className="flex flex-col shadow-inner">
-                                                                        {/* 1. Header Técnico (Barra Negra) */}
-                                                                        <div className="bg-slate-800 text-white px-6 py-2 flex items-center gap-6 text-[11px] font-bold tracking-tight">
-                                                                            <Activity size={16} className="text-blue-400" />
-                                                                            <span className="opacity-70">{selectedVantioStudy.PatientMainDicomTags?.PatientBirthDate}</span>
-                                                                            <span className="uppercase text-blue-400 font-black">{selectedVantioStudy.PatientMainDicomTags?.PatientName}</span>
-                                                                            <span className="opacity-70">{selectedVantioStudy.PatientMainDicomTags?.PatientID}</span>
-                                                                            <span className="uppercase">{selectedVantioStudy.MainDicomTags?.StudyDescription}</span>
-                                                                            <span className="ml-auto opacity-70">{selectedVantioStudy.MainDicomTags?.StudyDate}</span>
-                                                                            <span className="px-2 py-0.5 rounded bg-white/10 text-white">{selectedVantioStudy.ModalitiesInStudy}</span>
-                                                                            <span className="opacity-70 font-mono">{selectedVantioStudy.MainDicomTags?.AccessionNumber}</span>
-                                                                        </div>
+                                                                        {/* Contenido del Detalle del Estudio */}
+                                                                        <div className="p-0">
 
-                                                                        {/* 2. Cuerpo del Frame */}
-                                                                        <div className="p-8 space-y-6">
-                                                                            <div className="bg-white border border-slate-300 rounded shadow-sm px-4 py-2">
-                                                                                <input type="text" placeholder="Labels to add, press Enter to create or add a new one" className="w-full bg-transparent border-none outline-none text-sm text-slate-500 italic" />
-                                                                            </div>
+                                                                                <div className="grid grid-cols-12 gap-8 items-start">
+                                                                                    <div className="col-span-11 bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-2 gap-x-12 gap-y-1.5 text-[12px]">
+                                                                                        {/* Columna Izquierda */}
+                                                                                        <div className="space-y-1.5 pr-4 border-r border-slate-100">
+                                                                                            {[
+                                                                                                { label: "Fecha del estudio:", value: selectedVantioStudy.MainDicomTags?.StudyDate },
+                                                                                                { label: "Hora de estudio:", value: selectedVantioStudy.MainDicomTags?.StudyTime },
+                                                                                                { label: "Descripción del estudio:", value: selectedVantioStudy.MainDicomTags?.StudyDescription },
+                                                                                                { label: "Número de acceso:", value: selectedVantioStudy.MainDicomTags?.AccessionNumber },
+                                                                                                { label: "Identificación del estudio:", value: selectedVantioStudy.MainDicomTags?.StudyID },
+                                                                                                { label: "Study Instance UID:", value: selectedVantioStudy.MainDicomTags?.StudyInstanceUID },
+                                                                                                { label: "Médico solicitante:", value: selectedVantioStudy.MainDicomTags?.RequestingPhysician || "--" },
+                                                                                                { label: "Nombre del médico de referencia:", value: selectedVantioStudy.MainDicomTags?.ReferringPhysicianName || "--" },
+                                                                                                { label: "Nombre de la Institucion:", value: selectedVantioStudy.MainDicomTags?.InstitutionName || "CLINICA DEL VALLE" },
+                                                                                            ].map((row, i) => (
+                                                                                                <div key={i} className="flex justify-between items-center group/row py-0.5">
+                                                                                                    <span className="text-slate-800 font-bold whitespace-nowrap">{row.label}</span>
+                                                                                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                                                                                        <span className="text-slate-600 font-medium truncate">{row.value}</span>
+                                                                                                        <Copy 
+                                                                                                            size={11} 
+                                                                                                            className="text-slate-300 opacity-0 group-hover/row:opacity-100 cursor-pointer hover:text-blue-500 transition-all" 
+                                                                                                            onClick={() => navigator.clipboard.writeText(row.value)}
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
 
-                                                                            <div className="grid grid-cols-12 gap-8 items-start">
-                                                                                <div className="col-span-9 bg-white border border-slate-200 rounded-xl p-6 grid grid-cols-2 gap-x-12 gap-y-3 text-[12px] shadow-sm">
-                                                                                    <div className="space-y-2">
-                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
-                                                                                            <span className="text-slate-500 font-bold">Fecha del estudio:</span>
-                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.MainDicomTags?.StudyDate}</span>
+                                                                                        {/* Columna Derecha */}
+                                                                                        <div className="space-y-1.5 pl-4">
+                                                                                             <div className="flex flex-col h-full">
+                                                                                                {[
+                                                                                                    { label: "ID del paciente:", value: selectedVantioStudy.PatientMainDicomTags?.PatientID },
+                                                                                                    { label: "Nombre del paciente:", value: selectedVantioStudy.PatientMainDicomTags?.PatientName },
+                                                                                                    { label: "Fecha de nacimiento del paciente:", value: selectedVantioStudy.PatientMainDicomTags?.PatientBirthDate },
+                                                                                                    { label: "Sexo del paciente:", value: selectedVantioStudy.PatientMainDicomTags?.PatientSex || "F" },
+                                                                                                    { label: "OtherPatientIDs:", value: selectedVantioStudy.PatientMainDicomTags?.OtherPatientIDs || "--" },
+                                                                                                ].map((row, i) => (
+                                                                                                    <div key={i} className="flex justify-between items-center group/row py-0.5">
+                                                                                                        <span className="text-slate-800 font-bold whitespace-nowrap">{row.label}</span>
+                                                                                                        <div className="flex items-center gap-1.5 overflow-hidden">
+                                                                                                            <span className="text-slate-600 font-medium truncate">{row.value}</span>
+                                                                                                            <Copy 
+                                                                                                                size={11} 
+                                                                                                                className="text-slate-300 opacity-0 group-hover/row:opacity-100 cursor-pointer hover:text-blue-500 transition-all" 
+                                                                                                                onClick={() => navigator.clipboard.writeText(row.value)}
+                                                                                                            />
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                ))}
+                                                                                                <p className="text-slate-500 text-[11px] mt-auto italic pt-4 border-t border-slate-100">Este paciente no tiene otros estudios.</p>
+                                                                                             </div>
                                                                                         </div>
-                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
-                                                                                            <span className="text-slate-500 font-bold">Hora de estudio:</span>
-                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.MainDicomTags?.StudyTime}</span>
-                                                                                        </div>
-                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
-                                                                                            <span className="text-slate-500 font-bold">Acceso:</span>
-                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.MainDicomTags?.AccessionNumber}</span>
-                                                                                        </div>
-                                                                                        <div className="text-[10px] text-slate-400 break-all mt-4 font-mono">UID: {selectedVantioStudy.MainDicomTags?.StudyInstanceUID}</div>
                                                                                     </div>
-                                                                                    <div className="space-y-2">
-                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
-                                                                                            <span className="text-slate-500 font-bold">ID del paciente:</span>
-                                                                                            <span className="text-slate-900 font-mono font-bold text-blue-600">{selectedVantioStudy.PatientMainDicomTags?.PatientID}</span>
-                                                                                        </div>
-                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
-                                                                                            <span className="text-slate-500 font-bold">Nacimiento:</span>
-                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.PatientMainDicomTags?.PatientBirthDate}</span>
-                                                                                        </div>
-                                                                                        <p className="text-blue-600 text-[11px] font-bold mt-4 cursor-pointer hover:underline">Este paciente tiene más estudios..</p>
+
+                                                                                    {/* Buttons Area on the Right - Simplified to 3 */}
+                                                                                    <div className="col-span-1 mt-6 flex flex-row gap-2 justify-center">
+                                                                                        {[Eye, FileText, Activity].map((Icon, idx) => (
+                                                                                            <button 
+                                                                                                key={idx} 
+                                                                                                onClick={(e) => {
+                                                                                                    if (Icon === Eye) {
+                                                                                                        e.stopPropagation();
+                                                                                                        const studyUID = selectedVantioStudy.MainDicomTags?.StudyInstanceUID;
+                                                                                                        window.open(`http://${window.location.hostname}:8282/ohif/viewer?StudyInstanceUIDs=${studyUID}`, '_blank');
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="w-10 h-10 flex items-center justify-center rounded bg-slate-700 hover:bg-blue-600 text-white shadow-sm transition-all active:scale-95"
+                                                                                            >
+                                                                                                <Icon size={18} />
+                                                                                            </button>
+                                                                                        ))}
+                                                                                    </div>
                                                                                     </div>
                                                                                 </div>
-
-                                                                                <div className="col-span-3 grid grid-cols-5 gap-1">
-                                                                                    {[Eye, Layers, FileSearch, Database, Activity, UploadCloud, Trash, Edit, User, FileText].map((Icon, idx) => (
-                                                                                        <button key={idx} className="aspect-square bg-slate-600 hover:bg-blue-600 text-white rounded flex items-center justify-center p-2.5 shadow transition-all active:scale-90">
-                                                                                            <Icon size={18} />
-                                                                                        </button>
-                                                                                    ))}
-                                                                                </div>
-                                                                            </div>
 
                                                                             {/* Tabla de Series */}
                                                                             <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -1211,7 +1230,6 @@ function App() {
                                                                                 </table>
                                                                             </div>
                                                                         </div>
-                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         )}
@@ -1416,7 +1434,7 @@ function App() {
                                                 <div key={instId} className="bg-white p-2 rounded-lg border border-blue-100 shadow-sm flex flex-col group hover:ring-2 hover:ring-blue-400 transition-all">
                                                     <div className="aspect-square bg-black rounded overflow-hidden relative mb-2">
                                                         <img 
-                                                            src={`http://localhost:8282/instances/${instId}/preview`} 
+                                                            src={`http://${window.location.hostname}:8282/instances/${instId}/preview`} 
                                                             alt={`Img ${index}`} 
                                                             className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-opacity"
                                                             loading="lazy"
@@ -1522,7 +1540,7 @@ function App() {
                                             {rxResults.images.map((img, idx) => (
                                                 <div key={idx} className="relative group cursor-zoom-in">
                                                     <img 
-                                                        src={`http://localhost:809${img}`} 
+                                                        src={`http://${window.location.hostname}:809${img}`} 
                                                         alt={`Ventaneo ${idx}`}
                                                         className="w-full rounded border border-slate-200 shadow-sm"
                                                     />
@@ -1943,7 +1961,7 @@ function App() {
                                                             </>
                                                         ) : (
                                                             <a
-                                                                href={`http://localhost:809/api/download/${file.downloadPath}`}
+                                                                href={`http://${window.location.hostname}:809/api/download/${file.downloadPath}`}
                                                                 download
                                                                 className="btn btn-primary btn-sm"
                                                                 style={{ textDecoration: 'none', display: 'inline-block' }}

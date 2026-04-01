@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { UploadCloud, Image as ImageIcon, X, Loader2, Database, Search, ArrowUp, ArrowDown } from 'lucide-react';
 import { useDicom } from '../context/DicomContext';
 
-const BACKEND_URL = 'http://localhost:809';
+const BACKEND_URL = `http://${window.location.hostname}:809`;
 
 const DicomUploader = ({ label, id, file, setFile, onPreviewGenerated, onMoveUp, onMoveDown, isFirst, isLast }) => {
     const [preview, setPreview] = useState(null);

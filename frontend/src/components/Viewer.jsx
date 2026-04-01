@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useDicom } from '../context/DicomContext';
 
-const BACKEND_URL = 'http://localhost:809';
+const BACKEND_URL = `http://${window.location.hostname}:809`;
 
 export default function Viewer() {
     const {
