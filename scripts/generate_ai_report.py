@@ -1,6 +1,6 @@
 import sys
 import json
-import ollama
+import requests
 
 def generate_report(json_path):
     # 1. Leer el archivo JSON de inferencia
@@ -29,20 +29,27 @@ def generate_report(json_path):
     Evita inventar datos del paciente. Si falta información en el JSON, indícalo educadamente.
     """
     
-    # 3. Consultar a Ollama / MedGemma Q8
-    client = ollama.Client(host='http://monai_llm:11434')
-    MODEL_NAME = 'dcarrascosa/medgemma-1.5-4b-it:q8_0'
+    # 3. Consultar a LM Studio
+    payload = {
+        "model": "Medgemma 1.5 4B Instruct",
+        "messages": [
+            {"role": "system", "content": "Eres MedGemma, un radiólogo asistente clínico avanzado de IA. Redacta informes estructurados en español altamente profesionales."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.0
+    }
     
     try:
-        response = client.chat(model=MODEL_NAME, messages=[
-          {'role': 'system', 'content': 'Eres MedGemma, un radiólogo asistente clínico avanzado de IA. Redacta informes estructurados en español altamente profesionales.'},
-          {'role': 'user', 'content': prompt}
-        ], options={'temperature': 0.0})
+        print(f"[LM_STUDIO] Solicitando informe clínico basado en detecciones...")
+        response = requests.post("http://host.docker.internal:1234/v1/chat/completions", json=payload, timeout=200)
         
-        # OJO: Solo imprimimos el texto para que el child_process de Node.js lo capture limpio
-        print(response['message']['content'])
+        if response.status_code == 200:
+            print(response.json()['choices'][0]['message']['content'])
+        else:
+            print(f"ERROR_MODELO: Fallo en API LM Studio (Status: {response.status_code})")
+            
     except Exception as e:
-        print(f"ERROR_MODELO: Ocurrió un fallo con MedGemma: {e}")
+        print(f"ERROR_MODELO: Ocurrió un fallo con MedGemma en LM Studio: {e}")
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:

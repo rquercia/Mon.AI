@@ -25,8 +25,12 @@ from monai.bundle import ConfigParser
 
 def run_inference(model_type):
     # 1. Configuración de Rutas y Dispositivo
-    INPUT_DIR = "/opt/monai/data"
-    OUTPUT_DIR = "/opt/monai/output"
+    # Buscamos archivos en la carpeta raíz y en la subcarpeta input (donde llegan del backend)
+    INPUT_DIRS = ["/opt/monai/data", "/opt/monai/data/input"]
+    OUTPUT_DIR = "/opt/monai/data/output"
+    
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\n--- Iniciando Inferencia MONAI: {model_type.upper()} ---")
@@ -63,10 +67,17 @@ def run_inference(model_type):
         ])
 
     # 3. Datos
-    images = [os.path.join(INPUT_DIR, f) for f in os.listdir(INPUT_DIR) if f.endswith(('.nii', '.nii.gz'))]
+    images = []
+    for d in INPUT_DIRS:
+        if os.path.exists(d):
+            images += [os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(('.nii', '.nii.gz'))]
+    
     if not images:
-        print(f"Error: No hay archivos NIfTI en {INPUT_DIR}")
+        print(f"❌ Error: No se encontraron archivos NIfTI en las rutas: {INPUT_DIRS}")
+        print("⚠️  Asegúrate de convertir primero el estudio DICOM a NIfTI.")
         return
+
+    print(f"📁 Archivos encontrados para procesar: {len(images)}")
 
     ds = Dataset(data=[{"image": img} for img in images], transform=val_transforms)
     loader = DataLoader(ds, batch_size=1, num_workers=0)

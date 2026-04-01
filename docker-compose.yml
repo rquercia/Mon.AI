@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   monai-inference:
-    image: projectmonai/monai:1.3.2
+    build:
+      context: .
+      dockerfile: Dockerfile.monai
     container_name: monai_lung_detection
     runtime: nvidia
     environment:
@@ -19,9 +21,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [ gpu ]
-    command: >
-      bash -c "pip install monai-deploy-app-sdk dicom2nifti SimpleITK ollama langchain highdicom requests 'numpy<2' && 
-               tail -f /dev/null"
     working_dir: /opt/monai
 
   backend:

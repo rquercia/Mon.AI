@@ -159,7 +159,7 @@ app.post('/api/convert-to-dicom', (req, res) => {
 
   // Envolvemos rutas en comillas simples para evitar errores con nombres que contengan paréntesis
   // Usamos el script de bundle completo para incluir originales + máscara
-  const command = `docker exec monai_lung_detection python /opt/monai/scripts/export_full_dicom.py '/opt/monai/output/${niftiFile}' '/opt/monai/data' '/opt/monai/output/${outputZip}'`;
+  const command = `docker exec monai_lung_detection python /opt/monai/scripts/export_full_dicom.py '/opt/monai/data/output/${niftiFile}' '/opt/monai/data' '/opt/monai/data/output/${outputZip}'`;
 
   exec(command, (error, stdout, stderr) => {
     if (error) {
@@ -182,7 +182,7 @@ app.post('/api/generate-ai-report', (req, res) => {
   if (!jsonFile) return res.status(400).json({ error: 'Falta el archivo JSON' });
 
   // Rutas en el contenedor MONAI - asumimos filePath (e.g., jsonFile_det.json) desde la UI
-  const fullJsonPath = `/opt/monai/output/${path.basename(jsonFile)}`;
+  const fullJsonPath = `/opt/monai/data/output/${path.basename(jsonFile)}`;
   console.log(`Solicitando Reporte IA para: ${fullJsonPath}...`);
   
   const command = `docker exec monai_lung_detection python /opt/monai/scripts/generate_ai_report.py '${fullJsonPath}'`;
@@ -286,8 +286,8 @@ app.post('/api/preview', upload.single('image'), (req, res) => {
 
   const outputPrefix = `preview_${Date.now()}`;
   // En node, la ruta de output (para servir) es /app/data/output
-  // En MONAI, la ruta de output es /opt/monai/output
-  const monaiOutputFileBase = `/opt/monai/output/${outputPrefix}`;
+  // En MONAI, la ruta de output es /opt/monai/data/output
+  const monaiOutputFileBase = `/opt/monai/data/output/${outputPrefix}`;
   const monaiInputFile = `/opt/monai/data/${req.file.filename}`;
 
   const pythonProcess = spawn('docker', [
@@ -334,7 +334,7 @@ app.post('/api/process-panorama', upload.array('images', 10), (req, res) => {
   }
 
   const outputPrefix = `panorama_${Date.now()}`;
-  const monaiOutputFileBase = `/opt/monai/output/${outputPrefix}`;
+  const monaiOutputFileBase = `/opt/monai/data/output/${outputPrefix}`;
   const manualOffsets = req.body.manualOffsets || null;
 
   // Move files to shared directory
@@ -428,24 +428,34 @@ app.post('/api/pacs/push', async (req, res) => {
 });
 
 app.get('/api/pacs/studies', async (req, res) => {
-  const { date } = req.query;
+  const { 
+    patientName, 
+    patientId, 
+    patientBirthDate, 
+    studyDate, 
+    studyDescription, 
+    modality, 
+    accessionNumber 
+  } = req.query;
   
   try {
     const authHeader = { 'Authorization': 'Basic ' + Buffer.from('admin:admin').toString('base64') };
     
-    // Perform search
+    // Construimos el Query de forma dinámica
+    const query = {};
+    if (patientName) query.PatientName = `*${patientName}*`;
+    if (patientId) query.PatientID = `*${patientId}*`;
+    if (patientBirthDate) query.PatientBirthDate = patientBirthDate;
+    if (studyDate) query.StudyDate = studyDate;
+    if (studyDescription) query.StudyDescription = `*${studyDescription}*`;
+    if (modality) query.ModalitiesInStudy = modality;
+    if (accessionNumber) query.AccessionNumber = `*${accessionNumber}*`;
+
     const searchBody = {
       "Level": "Study",
-      "Query": {},
+      "Query": query,
       "Expand": true
     };
-    if (date && date.trim() !== "") {
-      searchBody.Query.StudyDate = date;
-    }
-    // Optional: Add PatientName support if provided in query
-    if (req.query.patientName) {
-      searchBody.Query.PatientName = `*${req.query.patientName}*`;
-    }
 
     const findResponse = await fetch('http://orthanc:8042/tools/find', {
       method: 'POST',
@@ -668,7 +678,7 @@ app.post('/api/analyze-full-study', (req, res) => {
   fs.writeFileSync(promptPath, customPrompt || "Actúa como un radiólogo sénior.");
 
   const monaiInputDir = `/opt/monai/data`;
-  const outputDir = `/opt/monai/output`;
+  const outputDir = `/opt/monai/data/output`;
   const monaiPromptPath = `/opt/monai/data/custom_prompt.txt`;
   
   console.log(`[BACKEND_DEBUG] Ejecutando: docker exec monai_lung_detection python /opt/monai/scripts/analyze_full_series.py "${monaiInputDir}" "${outputDir}" "${patientName || 'Paciente'}" "${monaiPromptPath}"`);
@@ -715,8 +725,11 @@ app.post('/api/preview-mosaico-lmstudio', (req, res) => {
     const wLung = (winLung && winLung.length === 2) ? `--win-lung ${winLung[0]} ${winLung[1]}` : "";
     const wBone = (winBone && winBone.length === 2) ? `--win-bone ${winBone[0]} ${winBone[1]}` : "";
 
-    // Comando con flag --preview y --zoom
-    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' --preview ${wGral} ${wLung} ${wBone}`;
+    // Escapamos comillas del JSON para que lleguen intactas al contenedor
+    const patientInfoEscaped = patientInfo.replace(/"/g, '\\"');
+
+    // Comando con flag --preview y --zoom usando doble comilla escapada para el JSON
+    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" "${patientInfoEscaped}" --preview ${wGral} ${wLung} ${wBone}`;
 
     exec(command, (error, stdout, stderr) => {
         try {
@@ -769,10 +782,13 @@ app.post('/api/analyze-rx-lmstudio', (req, res) => {
     const wLung = (winLung && winLung.length === 2) ? `--win-lung ${winLung[0]} ${winLung[1]}` : "";
     const wBone = (winBone && winBone.length === 2) ? `--win-bone ${winBone[0]} ${winBone[1]}` : "";
 
+    // Escapamos comillas del JSON para que lleguen intactas al contenedor
+    const patientInfoEscaped = patientInfo.replace(/"/g, '\\"');
+
     console.log(`[LM_STUDIO] Iniciando análisis para: ${patientName} con Ventanas: ${wGral} ${wLung} ${wBone}`);
 
-    // 2. Ejecutar script de LM Studio con parámetros dinámicos
-    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" '${patientInfo}' "${monaiPromptPath}" ${wGral} ${wLung} ${wBone}`;
+    // 2. Ejecutar script de LM Studio con parámetros dinámicos (usamos comillas dobles para el JSON escapado)
+    const command = `docker exec monai_lung_detection python /opt/monai/scripts/analyze_lmstudio.py "${monaiInputDir}" "${monaiOutputDir}" "${patientInfoEscaped}" "${monaiPromptPath}" ${wGral} ${wLung} ${wBone}`;
 
     exec(command, { maxBuffer: 1024 * 1024 * 80, timeout: 400000 }, (error, stdout, stderr) => {
         try {
@@ -859,9 +875,9 @@ app.post('/api/pacs/push-inference', async (req, res) => {
             return res.status(404).json({ error: 'No se encontró archivo de inferencia para exportar' });
         }
 
-        const maskPath = path.join('/opt/monai/output', maskFile);
+        const maskPath = path.join('/opt/monai/data/output', maskFile);
         const monaiInputDir = '/opt/monai/data'; // Ruta dentro del contenedor monai_lung_detection
-        const monaiOutBundle = '/opt/monai/output/push_bundle.zip';
+        const monaiOutBundle = '/opt/monai/data/output/push_bundle.zip';
         
         console.log(`Iniciando exportación sincronizada de ${maskFile} hacia PACS...`);
         
@@ -933,9 +949,9 @@ app.post('/api/pacs/push-medical-object', async (req, res) => {
             return res.status(404).json({ error: 'No se encontró archivo de inferencia' });
         }
 
-        const maskPath = path.join('/opt/monai/output', maskFile);
+        const maskPath = path.join('/opt/monai/data/output', maskFile);
         const monaiInputDir = '/opt/monai/data';
-        const dcmSegOutput = '/opt/monai/output/result_seg.dcm';
+        const dcmSegOutput = '/opt/monai/data/output/result_seg.dcm';
         
         console.log(`Generando Objeto Médico DICOM-SEG formal para ${maskFile}...`);
         
@@ -995,7 +1011,7 @@ app.post('/api/analyze-rx', (req, res) => {
   fs.writeFileSync(promptPath, customPrompt || "Actúa como un médico radiólogo.");
 
   const dcmPath = `/opt/monai/data/${files[0]}`;
-  const outputDir = `/opt/monai/output`;
+  const outputDir = `/opt/monai/data/output`;
   const monaiPromptPath = `/opt/monai/data/custom_prompt.txt`;
   
   console.log(`[BACKEND_DEBUG] Ejecutando: docker exec monai_lung_detection python /opt/monai/scripts/analyze_rx.py "${dcmPath}" "${outputDir}" "${monaiPromptPath}"`);

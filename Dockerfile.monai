@@ -1,0 +1,19 @@
+# Usamos la imagen oficial de MONAI como base
+FROM projectmonai/monai:1.3.2
+
+# Instalamos las librerías necesarias de forma permanente
+RUN pip install --no-cache-dir \
+    monai-deploy-app-sdk \
+    dicom2nifti \
+    SimpleITK \
+    ollama \
+    langchain \
+    highdicom \
+    requests \
+    "numpy<2"
+
+# Mantenemos el directorio de trabajo
+WORKDIR /opt/monai
+
+# Definimos que el contenedor se quede encendido por defecto
+CMD ["tail", "-f", "/dev/null"]

@@ -11,7 +11,15 @@ import {
     Layers,
     Database,
     Stethoscope,
-    Server
+    Server,
+    ChevronLeft,
+    Eye,
+    Trash,
+    Edit,
+    User,
+    FileText,
+    ChevronUp,
+    ChevronDown
 } from 'lucide-react';
 import { DicomProvider } from './context/DicomContext';
 import EspinografiaSidebar from './components/EspinografiaSidebar';
@@ -84,7 +92,15 @@ function App() {
     // Vantio PACS States
     const [vantioStudies, setVantioStudies] = useState([]);
     const [vantioLoading, setVantioLoading] = useState(false);
-    const [vantioSearch, setVantioSearch] = useState({ patientName: '', date: '' });
+    const [vantioSearch, setVantioSearch] = useState({ 
+        patientName: '', 
+        patientId: '', 
+        patientBirthDate: '', 
+        studyDate: '', 
+        studyDescription: '', 
+        modality: '', 
+        accessionNumber: '' 
+    });
     const [selectedVantioStudy, setSelectedVantioStudy] = useState(null);
     const [vantioSeries, setVantioSeries] = useState([]);
 
@@ -113,9 +129,18 @@ function App() {
     const handleSearchVantio = async () => {
         setVantioLoading(true);
         try {
-            const dateQuery = vantioSearch.date ? `&date=${vantioSearch.date.replace(/-/g, '')}` : '';
-            const nameQuery = vantioSearch.patientName ? `&patientName=${vantioSearch.patientName}` : '';
-            const response = await fetch(`http://localhost:809/api/pacs/studies?_t=${Date.now()}${dateQuery}${nameQuery}`);
+            const params = new URLSearchParams({
+                _t: Date.now(),
+                patientName: vantioSearch.patientName,
+                patientId: vantioSearch.patientId,
+                patientBirthDate: vantioSearch.patientBirthDate.replace(/-/g, ''),
+                studyDate: vantioSearch.studyDate.replace(/-/g, ''),
+                studyDescription: vantioSearch.studyDescription,
+                modality: vantioSearch.modality,
+                accessionNumber: vantioSearch.accessionNumber
+            });
+
+            const response = await fetch(`http://localhost:809/api/pacs/studies?${params.toString()}`);
             if (response.ok) {
                 const data = await response.json();
                 setVantioStudies(data);
@@ -1015,230 +1040,187 @@ function App() {
 
                     {activeTab === 'pacs-vantio' && (
                         <div className="vantio-pacs-container animate-in fade-in duration-500">
-                            <div className="flex justify-between items-center mb-8">
+                            <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h2 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">PACS Vantio Premium</h2>
-                                    <p className="text-slate-500 mt-1">Explora y gestiona estudios médicos sincronizados con Orthanc</p>
+                                    <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                        <Database className="text-blue-600" size={24} /> PACS Vantio Clinical Explorer
+                                    </h2>
+                                    <p className="text-slate-500 text-sm">Gestiona y analiza estudios directamente desde el archivo central de imágenes</p>
                                 </div>
-                                <div className="flex gap-3">
-                                    <button 
-                                        onClick={handleSearchVantio}
-                                        className="btn btn-secondary shadow-sm hover:shadow-md transition-all active:scale-95"
-                                        disabled={vantioLoading}
-                                    >
-                                        <Activity size={18} className={vantioLoading ? 'animate-spin' : ''} />
-                                        Actualizar
+                                <div className="flex gap-2">
+                                    <button onClick={handleSearchVantio} className="btn-icon bg-white shadow-sm border border-slate-200 p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-all">
+                                        <Activity size={20} className={vantioLoading ? 'animate-spin' : ''} />
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Filtros Modernos */}
-                            <div className="card border-none shadow-xl bg-white/70 backdrop-blur-xl mb-8 p-6">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Paciente</label>
-                                        <div className="relative group">
-                                            <FileSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
-                                            <input 
-                                                type="text" 
-                                                placeholder="Nombre o ID..."
-                                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
-                                                value={vantioSearch.patientName}
-                                                onChange={(e) => setVantioSearch({...vantioSearch, patientName: e.target.value})}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Fecha de Estudio</label>
-                                        <input 
-                                            type="date" 
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
-                                            value={vantioSearch.date}
-                                            onChange={(e) => setVantioSearch({...vantioSearch, date: e.target.value})}
-                                        />
-                                    </div>
-                                    <div className="flex items-end">
-                                        <button 
-                                            onClick={handleSearchVantio}
-                                            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all active:scale-95"
-                                        >
-                                            Buscar Estudios
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                                {/* Listado de Estudios */}
-                                <div className={selectedVantioStudy ? 'lg:col-span-12 xl:col-span-7' : 'lg:col-span-12'}>
-                                    <div className="card border-none shadow-xl overflow-hidden bg-white/80 p-0">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left border-separate border-spacing-0">
-                                                <thead>
-                                                    <tr className="bg-slate-50/50">
-                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100 first:rounded-tl-2xl">Paciente / ID</th>
-                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100">Fecha</th>
-                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100">Descripción / Modalidad</th>
-                                                        <th className="px-6 py-4 font-bold text-slate-500 border-b border-slate-100 last:rounded-tr-2xl">Acciones</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-50">
-                                                    {vantioStudies.length === 0 ? (
-                                                        <tr>
-                                                            <td colSpan="4" className="px-6 py-12 text-center text-slate-400 italic">
-                                                                {vantioLoading ? 'Cargando estudios...' : 'No se encontraron estudios coincidentes.'}
+                            <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden min-h-[600px] transition-all duration-500">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm border-collapse">
+                                        <thead>
+                                            {/* Encabezados Principales */}
+                                            <tr className="bg-slate-50 text-slate-500 text-[11px] font-black uppercase tracking-wider border-b border-slate-200">
+                                                <th className="px-3 py-3 w-10 text-center"></th>
+                                                <th className="px-3 py-3">Fecha nacimiento</th>
+                                                <th className="px-3 py-3">Nombre del paciente</th>
+                                                <th className="px-3 py-3">ID del paciente</th>
+                                                <th className="px-3 py-3">Descripción del estudio</th>
+                                                <th className="px-3 py-3">Fecha estudio</th>
+                                                <th className="px-3 py-3">Modalidad</th>
+                                                <th className="px-3 py-3 text-center"># Ser/Inst</th>
+                                                <th className="px-3 py-3"></th>
+                                            </tr>
+                                            {/* Fila de Filtros */}
+                                            <tr className="bg-slate-100/50 border-b border-slate-200">
+                                                <th className="p-2 border-r border-slate-200/50">
+                                                    <button onClick={() => { setVantioSearch({patientName:'', patientId:'', patientBirthDate:'', studyDate:'', studyDescription:'', modality:'', accessionNumber:''}); setTimeout(handleSearchVantio, 0); }} className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">&times;</button>
+                                                </th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientBirthDate} onChange={(e) => setVantioSearch({...vantioSearch, patientBirthDate: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientName} onChange={(e) => setVantioSearch({...vantioSearch, patientName: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.patientId} onChange={(e) => setVantioSearch({...vantioSearch, patientId: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.studyDescription} onChange={(e) => setVantioSearch({...vantioSearch, studyDescription: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50"><input type="text" className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.studyDate} onChange={(e) => setVantioSearch({...vantioSearch, studyDate: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleSearchVantio()} /></th>
+                                                <th className="p-2 border-r border-slate-200/50">
+                                                    <select className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none" value={vantioSearch.modality} onChange={(e) => { setVantioSearch({...vantioSearch, modality: e.target.value}); setTimeout(handleSearchVantio, 0); }}>
+                                                        <option value="">Todas</option><option value="CT">CT</option><option value="DX">DX</option><option value="MR">MR</option>
+                                                    </select>
+                                                </th>
+                                                <th colSpan="2" className="p-2">
+                                                    <button onClick={handleSearchVantio} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-[10px] uppercase shadow-md transition-all active:scale-95">Buscar</button>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {vantioStudies.length === 0 ? (
+                                                <tr><td colSpan="9" className="px-6 py-20 text-center text-slate-400 italic">Buscando estudios...</td></tr>
+                                            ) : (
+                                                vantioStudies.map((study) => (
+                                                    <React.Fragment key={study.ID}>
+                                                        {/* Fila del Estudio */}
+                                                        <tr 
+                                                            onClick={() => handleSelectVantioStudy(study)} 
+                                                            className={`group border-l-4 transition-all hover:bg-blue-50/20 cursor-pointer ${selectedVantioStudy?.ID === study.ID ? 'bg-blue-50/50 border-blue-500 shadow-sm' : 'border-transparent'}`}
+                                                        >
+                                                            <td className="px-2 py-3 text-center">
+                                                                <input type="checkbox" className="rounded" checked={selectedVantioStudy?.ID === study.ID} readOnly />
+                                                            </td>
+                                                            <td className="px-3 py-3 font-mono text-xs text-slate-500">{study.PatientMainDicomTags?.PatientBirthDate || 'N/A'}</td>
+                                                            <td className="px-3 py-3 font-bold text-slate-900">{study.PatientMainDicomTags?.PatientName || 'Unknown'}</td>
+                                                            <td className="px-3 py-3 font-mono text-xs text-blue-600">{study.PatientMainDicomTags?.PatientID || 'S/ID'}</td>
+                                                            <td className="px-3 py-3 text-slate-600 truncate max-w-[150px]">{study.MainDicomTags?.StudyDescription || '--'}</td>
+                                                            <td className="px-3 py-3 text-slate-600 text-[11px] font-bold">{study.MainDicomTags?.StudyDate || 'N/A'}</td>
+                                                            <td className="px-3 py-3">
+                                                                <span className="bg-blue-100/50 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-black">{study.ModalitiesInStudy || "UN"}</span>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-center text-xs font-bold text-slate-500">{study.Series?.length || 0} / {study.Instances?.length || 0}</td>
+                                                            <td className="px-3 py-3 text-right">
+                                                                {selectedVantioStudy?.ID === study.ID ? <ChevronUp size={16} className="text-blue-600" /> : <ChevronDown size={16} className="text-slate-400" />}
                                                             </td>
                                                         </tr>
-                                                    ) : (
-                                                        vantioStudies.map((study) => (
-                                                            <tr 
-                                                                key={study.ID} 
-                                                                onClick={() => handleSelectVantioStudy(study)}
-                                                                className={`group cursor-pointer transition-all hover:bg-blue-50/50 ${selectedVantioStudy?.ID === study.ID ? 'bg-blue-50 ring-1 ring-inset ring-blue-500/20' : ''}`}
-                                                            >
-                                                                <td className="px-6 py-4">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                                                                            {study.PatientMainDicomTags?.PatientName?.charAt(0) || 'P'}
+
+                                                        {/* FRAME DE DETALLE (INYECTADO ABAJO) */}
+                                                        {selectedVantioStudy?.ID === study.ID && (
+                                                            <tr className="bg-[#E9E9E9] animate-in slide-in-from-top duration-500">
+                                                                <td colSpan="9" className="p-0 border-y border-slate-300">
+                                                                    <div className="flex flex-col shadow-inner">
+                                                                        {/* 1. Header Técnico (Barra Negra) */}
+                                                                        <div className="bg-slate-800 text-white px-6 py-2 flex items-center gap-6 text-[11px] font-bold tracking-tight">
+                                                                            <Activity size={16} className="text-blue-400" />
+                                                                            <span className="opacity-70">{selectedVantioStudy.PatientMainDicomTags?.PatientBirthDate}</span>
+                                                                            <span className="uppercase text-blue-400 font-black">{selectedVantioStudy.PatientMainDicomTags?.PatientName}</span>
+                                                                            <span className="opacity-70">{selectedVantioStudy.PatientMainDicomTags?.PatientID}</span>
+                                                                            <span className="uppercase">{selectedVantioStudy.MainDicomTags?.StudyDescription}</span>
+                                                                            <span className="ml-auto opacity-70">{selectedVantioStudy.MainDicomTags?.StudyDate}</span>
+                                                                            <span className="px-2 py-0.5 rounded bg-white/10 text-white">{selectedVantioStudy.ModalitiesInStudy}</span>
+                                                                            <span className="opacity-70 font-mono">{selectedVantioStudy.MainDicomTags?.AccessionNumber}</span>
                                                                         </div>
-                                                                        <div>
-                                                                            <span className="block font-bold text-slate-900 leading-tight">{study.PatientMainDicomTags?.PatientName || 'N/A'}</span>
-                                                                            <span className="block text-xs text-slate-400 font-mono mt-0.5">{study.PatientMainDicomTags?.PatientID || 'S/ID'}</span>
+
+                                                                        {/* 2. Cuerpo del Frame */}
+                                                                        <div className="p-8 space-y-6">
+                                                                            <div className="bg-white border border-slate-300 rounded shadow-sm px-4 py-2">
+                                                                                <input type="text" placeholder="Labels to add, press Enter to create or add a new one" className="w-full bg-transparent border-none outline-none text-sm text-slate-500 italic" />
+                                                                            </div>
+
+                                                                            <div className="grid grid-cols-12 gap-8 items-start">
+                                                                                <div className="col-span-9 bg-white border border-slate-200 rounded-xl p-6 grid grid-cols-2 gap-x-12 gap-y-3 text-[12px] shadow-sm">
+                                                                                    <div className="space-y-2">
+                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
+                                                                                            <span className="text-slate-500 font-bold">Fecha del estudio:</span>
+                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.MainDicomTags?.StudyDate}</span>
+                                                                                        </div>
+                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
+                                                                                            <span className="text-slate-500 font-bold">Hora de estudio:</span>
+                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.MainDicomTags?.StudyTime}</span>
+                                                                                        </div>
+                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
+                                                                                            <span className="text-slate-500 font-bold">Acceso:</span>
+                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.MainDicomTags?.AccessionNumber}</span>
+                                                                                        </div>
+                                                                                        <div className="text-[10px] text-slate-400 break-all mt-4 font-mono">UID: {selectedVantioStudy.MainDicomTags?.StudyInstanceUID}</div>
+                                                                                    </div>
+                                                                                    <div className="space-y-2">
+                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
+                                                                                            <span className="text-slate-500 font-bold">ID del paciente:</span>
+                                                                                            <span className="text-slate-900 font-mono font-bold text-blue-600">{selectedVantioStudy.PatientMainDicomTags?.PatientID}</span>
+                                                                                        </div>
+                                                                                        <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
+                                                                                            <span className="text-slate-500 font-bold">Nacimiento:</span>
+                                                                                            <span className="text-slate-900 font-mono">{selectedVantioStudy.PatientMainDicomTags?.PatientBirthDate}</span>
+                                                                                        </div>
+                                                                                        <p className="text-blue-600 text-[11px] font-bold mt-4 cursor-pointer hover:underline">Este paciente tiene más estudios..</p>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="col-span-3 grid grid-cols-5 gap-1">
+                                                                                    {[Eye, Layers, FileSearch, Database, Activity, UploadCloud, Trash, Edit, User, FileText].map((Icon, idx) => (
+                                                                                        <button key={idx} className="aspect-square bg-slate-600 hover:bg-blue-600 text-white rounded flex items-center justify-center p-2.5 shadow transition-all active:scale-90">
+                                                                                            <Icon size={18} />
+                                                                                        </button>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Tabla de Series */}
+                                                                            <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                                                                <table className="w-full text-xs">
+                                                                                    <thead>
+                                                                                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
+                                                                                            <th className="px-4 py-2 text-left">Número de serie</th>
+                                                                                            <th className="px-4 py-2 text-left">Descripción de la serie</th>
+                                                                                            <th className="px-4 py-2 text-center">Modalidad</th>
+                                                                                            <th className="px-4 py-2 text-right"># Elementos</th>
+                                                                                            <th className="px-4 py-2"></th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody className="divide-y divide-slate-100">
+                                                                                        {vantioSeries.map(series => (
+                                                                                            <tr key={series.ID} className="hover:bg-blue-50/30 transition-colors group">
+                                                                                                <td className="px-4 py-3 font-mono text-slate-400">{series.MainDicomTags?.SeriesNumber || '--'}</td>
+                                                                                                <td className="px-4 py-3 font-bold text-slate-800 uppercase">{series.MainDicomTags?.SeriesDescription || 'Untitled Series'}</td>
+                                                                                                <td className="px-4 py-3 text-center"><span className="bg-slate-100 px-2 py-0.5 rounded font-black">{series.MainDicomTags?.Modality}</span></td>
+                                                                                                <td className="px-4 py-3 text-right font-mono font-bold text-blue-600">{series.Instances?.length}</td>
+                                                                                                <td className="px-4 py-3 text-right">
+                                                                                                    <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                                        <button onClick={() => { handleImportSeries(series); setActiveTab('dicom'); }} className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-1 rounded-lg">Importar</button>
+                                                                                                        <button onClick={() => { handleSelectStudy(selectedVantioStudy); setActiveTab('resultados'); }} className="bg-slate-800 hover:bg-black text-white text-[10px] font-bold px-3 py-1 rounded-lg">Analizar IA</button>
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        ))}
+                                                                                    </tbody>
+                                                                                </table>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-4">
-                                                                    <span className="text-sm font-medium text-slate-600">
-                                                                        {study.MainDicomTags?.StudyDate ? 
-                                                                            `${study.MainDicomTags.StudyDate.slice(6,8)}/${study.MainDicomTags.StudyDate.slice(4,6)}/${study.MainDicomTags.StudyDate.slice(0,4)}` 
-                                                                            : 'N/A'
-                                                                        }
-                                                                    </span>
-                                                                </td>
-                                                                <td className="px-6 py-4">
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <span className="text-sm font-semibold text-slate-700 truncate max-w-[200px]">{study.MainDicomTags?.StudyDescription || 'Estudio sin descripción'}</span>
-                                                                        <div className="flex gap-1">
-                                                                            {(study.ModalitiesInStudy || "").split('/').map(m => (
-                                                                                m && <span key={m} className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter ${m === 'CT' ? 'bg-orange-100 text-orange-600' : m === 'DX' || m === 'CR' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{m}</span>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-right">
-                                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button className="p-2 rounded-lg bg-white border border-slate-100 shadow-sm text-blue-600 hover:bg-blue-600 hover:text-white transition-all">
-                                                                            <Activity size={16} />
-                                                                        </button>
                                                                     </div>
                                                                 </td>
                                                             </tr>
-                                                        ))
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
+                                                        )}
+                                                    </React.Fragment>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
-
-                                {/* Detalle del Estudio Seleccionado */}
-                                {selectedVantioStudy && (
-                                    <div className="lg:col-span-12 xl:col-span-5 animate-in slide-in-from-right duration-300">
-                                        <div className="card border-none shadow-2xl bg-slate-900 text-white p-0 overflow-hidden h-full sticky top-8">
-                                            <div className="p-6 border-b border-white/10 bg-gradient-to-br from-slate-800 to-slate-900">
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-500/30">Detalle de Estudio</span>
-                                                    <button onClick={() => setSelectedVantioStudy(null)} className="text-slate-500 hover:text-white transition-colors">&times;</button>
-                                                </div>
-                                                <h3 className="text-xl font-bold text-white mb-1">{selectedVantioStudy.PatientMainDicomTags?.PatientName}</h3>
-                                                <div className="flex items-center gap-4 text-slate-400 text-sm">
-                                                    <span className="flex items-center gap-1"><Database size={14} /> {selectedVantioStudy.MainDicomTags?.StudyID || 'S/N'}</span>
-                                                    <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                                                    <span>{selectedVantioStudy.Series?.length || 0} Series detectadas</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="p-6 space-y-6">
-                                                {vantioLoading ? (
-                                                    <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-4">
-                                                        <Activity className="animate-spin text-blue-500" size={32} />
-                                                        <p className="text-sm font-medium">Sincronizando series de Orthanc...</p>
-                                                    </div>
-                                                ) : vantioSeries.length > 0 ? (
-                                                    <div className="space-y-4">
-                                                        {vantioSeries.map((series) => (
-                                                            <div key={series.ID} className="group/item bg-slate-800/50 border border-white/5 rounded-2xl p-4 hover:bg-slate-800 hover:border-blue-500/30 transition-all">
-                                                                <div className="flex justify-between items-center mb-3">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold group-hover/item:bg-blue-500 group-hover/item:text-white transition-all">
-                                                                            {series.MainDicomTags?.SeriesNumber || '#'}
-                                                                        </div>
-                                                                        <div>
-                                                                            <span className="block text-sm font-bold text-white leading-tight">{series.MainDicomTags?.SeriesDescription || 'Serie sin nombre'}</span>
-                                                                            <span className="block text-[10px] text-slate-500 font-mono">{series.Instances?.length || 0} imágenes</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${series.MainDicomTags?.Modality === 'CT' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                                                        {series.MainDicomTags?.Modality}
-                                                                    </span>
-                                                                </div>
-                                                                
-                                                                <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/5">
-                                                                    <button 
-                                                                        onClick={() => {
-                                                                            // Logic based on modality
-                                                                            if (series.MainDicomTags?.Modality === 'CT') {
-                                                                                handleImportSeries(series);
-                                                                                setActiveTab('dicom');
-                                                                            } else if (['DX', 'CR'].includes(series.MainDicomTags?.Modality)) {
-                                                                                handleSelectStudy(selectedVantioStudy);
-                                                                                setActiveTab('radiografia');
-                                                                            }
-                                                                        }}
-                                                                        className="flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 hover:bg-blue-600 transition-all text-xs font-bold"
-                                                                    >
-                                                                        <UploadCloud size={14} /> Importar
-                                                                    </button>
-                                                                    <button 
-                                                                        className="flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 hover:bg-indigo-600 transition-all text-xs font-bold"
-                                                                        onClick={() => {
-                                                                            handleSelectStudy(selectedVantioStudy);
-                                                                            if (['DX', 'CR'].includes(series.MainDicomTags?.Modality)) {
-                                                                                setActiveTab('radiografia');
-                                                                            } else {
-                                                                                setActiveTab('resultados');
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        <Cpu size={14} /> Analizar IA
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-center py-8 text-slate-500">
-                                                        No se encontraron series para este estudio.
-                                                    </div>
-                                                )}
-                                            </div>
-                                            
-                                            <div className="mt-auto p-6 bg-slate-950/50">
-                                                <button 
-                                                    className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-xs uppercase tracking-[3px] shadow-2xl shadow-blue-500/20 transition-all active:scale-95"
-                                                    onClick={() => {
-                                                        // Example global action
-                                                        handleSelectStudy(selectedVantioStudy);
-                                                        setActiveTab('radiografia');
-                                                    }}
-                                                >
-                                                    Procesar Estudio Completo
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}

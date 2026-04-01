@@ -1,12 +1,17 @@
 import SimpleITK as sitk
-import ollama
+import requests
 import sys
 import os
 import json
 import time
+import base64
 from datetime import datetime
 import numpy as np
 from PIL import Image
+
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 def generate_filters(img):
     # Generar 3 Ventanas
@@ -53,7 +58,6 @@ def analyze_full(input_dir, output_dir, patient_name="Paciente", custom_prompt_p
                 img = img[:, :, 0]
 
             # Re-escalar para que todas las placas tengan el mismo ancho antes de procesar
-            # Usamos un ancho estándar de 2048px para mantener la calidad técnica
             target_width = 2048
             original_size = img.GetSize()
             scale = target_width / original_size[0]
@@ -117,21 +121,35 @@ def analyze_full(input_dir, output_dir, patient_name="Paciente", custom_prompt_p
         Responde directamente en formato Markdown.
         """
 
-        client = ollama.Client(host='http://monai_llm:11434')
-        MODEL_NAME = 'dcarrascosa/medgemma-1.5-4b-it:q8_0'
-
-        response = client.chat(
-            model=MODEL_NAME,
-            messages=[
-                {'role': 'user', 'content': prompt_final, 'images': [mosaico_path]}
-            ],
-            options={'temperature': 0.0}
-        )
+        # Preparar envío a LM Studio
+        base64_mosaico = encode_image(mosaico_path)
         
-        report_content = response.get('message', {}).get('content', '')
+        payload = {
+            "model": "Medgemma 1.5 4B Instruct",
+            "messages": [
+                {"role": "system", "content": "Análisis clínico integral multicanal. Correlaciona las proyecciones adjuntas."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt_final},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_mosaico}"}}
+                    ]
+                }
+            ],
+            "temperature": 0.1
+        }
+
+        print(f"[LM_STUDIO] Enviando mosaico integral a LM Studio...")
+        response = requests.post("http://host.docker.internal:1234/v1/chat/completions", json=payload, timeout=600)
+        
+        if response.status_code == 200:
+            report_content = response.json()['choices'][0]['message']['content']
+        else:
+            print(f"Error API: {response.status_code}")
+            report_content = "Error al conectar con LM Studio."
         
         print("---RADIOLOGY_REPORT_START---")
-        print(report_content if report_content else "Error en IA.")
+        print(report_content)
         print("---RADIOLOGY_REPORT_END---")
         print(f"---IMAGES_GENERATED---:{json.dumps(ui_paths)}")
 
